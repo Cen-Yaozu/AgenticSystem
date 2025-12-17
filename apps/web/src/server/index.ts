@@ -4,14 +4,16 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger as honoLogger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
+import { resolve } from 'path';
 
-import { initDatabase } from './database/index';
-import { errorHandler } from './middleware/error';
-import { requestLogger } from './middleware/logger';
-import { logger } from './utils/logger';
+import { initDatabase } from './database/index.js';
+import { errorHandler } from './middleware/error.js';
+import { requestLogger } from './middleware/logger.js';
+import assistantsRoutes from './routes/assistants.js';
+import { logger } from './utils/logger.js';
 
-// 加载环境变量
-config();
+// 加载环境变量（从项目根目录）
+config({ path: resolve(process.cwd(), '../../.env') });
 
 // 创建 Hono 应用
 const app = new Hono();
@@ -37,19 +39,22 @@ app.get('/health', (c) => {
   });
 });
 
-// API 路由占位
+// API 路由
 app.get('/api', (c) => {
   return c.json({
     message: 'AgentX Agentic RAG API',
     version: '0.1.0',
     endpoints: {
       health: '/health',
-      assistants: '/api/assistants',
-      documents: '/api/documents',
-      conversations: '/api/conversations',
+      assistants: '/api/v1/assistants',
+      documents: '/api/v1/documents',
+      conversations: '/api/v1/conversations',
     },
   });
 });
+
+// 挂载助手路由
+app.route('/api/v1/assistants', assistantsRoutes);
 
 // 404 处理
 app.notFound((c) => {

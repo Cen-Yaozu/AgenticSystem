@@ -63,8 +63,8 @@ export interface CreateAssistantInput {
 
 export interface UpdateAssistantInput {
   name?: string;
-  description?: string;
-  domain?: string;
+  description?: string | null;
+  domain?: string | null;
   settings?: Partial<AssistantSettings>;
 }
 

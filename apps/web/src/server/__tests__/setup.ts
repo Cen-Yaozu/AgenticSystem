@@ -1,113 +1,42 @@
+/**
+ * Vitest 测试设置文件
+ * 在所有测试运行前执行
+ *
+ * 使用内存数据库进行测试，避免文件系统权限问题
+ */
+
 import Database from 'better-sqlite3';
-import { existsSync, mkdirSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
-import { logger } from '../utils/logger.js';
+import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+// 使用内存数据库
+let testDb: Database.Database | null = null;
 
-// 数据库路径
-const DB_PATH = process.env.DATABASE_PATH || join(__dirname, '../../../../../data/agentic-rag.db');
-
-let db: Database.Database | null = null;
+// 测试常量
+export const TEST_USER_ID = 'test-user-001';
+export const TEST_API_KEY = 'test-api-key';
 
 /**
- * 获取数据库实例
+ * 获取测试数据库实例
  */
-export function getDatabase(): Database.Database {
-  if (!db) {
-    throw new Error('Database not initialized. Call initDatabase() first.');
+export function getTestDatabase(): Database.Database {
+  if (!testDb) {
+    throw new Error('Test database not initialized');
   }
-  return db;
+  return testDb;
 }
 
 /**
- * 初始化数据库
+ * 创建数据库 Schema
  */
-export async function initDatabase(): Promise<void> {
-  if (db) {
-    logger.warn('Database already initialized');
-    return;
-  }
-
-  // 确保数据目录存在
-  const dbDir = dirname(DB_PATH);
-  if (!existsSync(dbDir)) {
-    mkdirSync(dbDir, { recursive: true });
-    logger.info(`Created database directory: ${dbDir}`);
-  }
-
-  // 创建数据库连接
-  db = new Database(DB_PATH);
-
-  // 启用 WAL 模式以提高并发性能
-  db.pragma('journal_mode = WAL');
-
-  // 启用外键约束
-  db.pragma('foreign_keys = ON');
-
-  logger.info(`Database initialized at: ${DB_PATH}`);
-
-  // 运行迁移
-  await runMigrations();
-}
-
-/**
- * 关闭数据库连接
- */
-export function closeDatabase(): void {
-  if (db) {
-    db.close();
-    db = null;
-    logger.info('Database connection closed');
-  }
-}
-
-/**
- * 运行数据库迁移
- */
-async function runMigrations(): Promise<void> {
-  if (!db) return;
-
-  logger.info('Running database migrations...');
-
-  // 创建迁移记录表
+function createSchema(db: Database.Database): void {
   db.exec(`
+    -- 迁移记录表
     CREATE TABLE IF NOT EXISTS _migrations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
       applied_at TEXT DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
+    );
 
-  // 获取已应用的迁移
-  const applied = db.prepare('SELECT name FROM _migrations').all() as { name: string }[];
-  const appliedSet = new Set(applied.map(m => m.name));
-
-  // 定义迁移
-  const migrations = [
-    { name: '001_initial_schema', sql: getInitialSchema() },
-    { name: '002_default_user', sql: getDefaultUserMigration() },
-  ];
-
-  // 应用未执行的迁移
-  for (const migration of migrations) {
-    if (!appliedSet.has(migration.name)) {
-      logger.info(`Applying migration: ${migration.name}`);
-      db.exec(migration.sql);
-      db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(migration.name);
-      logger.info(`Migration applied: ${migration.name}`);
-    }
-  }
-
-  logger.info('Database migrations completed');
-}
-
-/**
- * 初始 Schema
- */
-function getInitialSchema(): string {
-  return `
     -- 用户表
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -231,26 +160,64 @@ function getInitialSchema(): string {
 
     CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
     CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
-  `;
-}
 
-/**
- * 默认用户迁移
- * 创建一个默认用户用于 MVP 阶段的 API Key 认证
- */
-function getDefaultUserMigration(): string {
-  return `
-    -- 插入默认用户（如果不存在）
-    INSERT OR IGNORE INTO users (id, name, email, status, created_at, updated_at)
+    -- 插入测试用户
+    INSERT INTO users (id, name, email, status, created_at, updated_at)
     VALUES (
-      'default-user-001',
-      'Default User',
-      'default@agentic-rag.local',
+      'test-user-001',
+      'Test User',
+      'test@example.com',
       'active',
       CURRENT_TIMESTAMP,
       CURRENT_TIMESTAMP
     );
-  `;
+  `);
 }
 
-export { db };
+/**
+ * 初始化测试数据库（内存数据库）
+ */
+export function initTestDatabase(): Database.Database {
+  // 创建内存数据库
+  testDb = new Database(':memory:');
+  testDb.pragma('foreign_keys = ON');
+
+  // 创建 Schema
+  createSchema(testDb);
+
+  return testDb;
+}
+
+/**
+ * 清理测试数据库
+ */
+export function cleanupTestDatabase(): void {
+  if (testDb) {
+    testDb.close();
+    testDb = null;
+  }
+}
+
+/**
+ * 清空测试数据（保留表结构和测试用户）
+ */
+export function clearTestData(): void {
+  if (testDb) {
+    testDb.exec('DELETE FROM assistants');
+  }
+}
+
+// 全局测试钩子
+beforeAll(() => {
+  // 设置环境变量
+  process.env.NODE_ENV = 'test';
+  process.env.API_KEY = TEST_API_KEY;
+});
+
+afterAll(() => {
+  cleanupTestDatabase();
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
