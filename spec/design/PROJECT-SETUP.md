@@ -1,8 +1,8 @@
 # 项目初始化指南
 
-> **版本**: 1.0.0  
-> **状态**: Draft  
-> **最后更新**: 2024-12-16
+> **版本**: 2.0.0
+> **状态**: Draft
+> **最后更新**: 2024-12-17
 
 ---
 
@@ -10,11 +10,14 @@
 
 本文档定义 AgentX Agentic RAG 系统的项目结构、技术栈和初始化步骤。
 
+> **注意**: 本文档已更新以反映实际项目结构。项目采用前后端一体的 Monorepo 结构。
+
 ### 相关文档
 
 | 文档 | 描述 |
 |------|------|
 | [技术架构](./TECHNICAL-ARCHITECTURE.md) | 系统架构设计 |
+| [Agentic 架构](./AGENTIC-ARCHITECTURE.md) | 多角色架构设计 |
 | [数据模型](./DATA-MODEL.md) | 数据库设计 |
 | [API 参考](./API-REFERENCE.md) | API 接口定义 |
 
@@ -22,112 +25,114 @@
 
 ## 2. 项目结构
 
-### 2.1 Monorepo 结构
+### 2.1 Monorepo 结构（实际）
 
 ```
 agentic-rag/
-├── packages/
-│   ├── backend/                 # 后端服务
-│   │   ├── src/
-│   │   │   ├── api/             # API 路由层
-│   │   │   │   ├── routes/      # 路由定义
-│   │   │   │   ├── middlewares/ # 中间件
-│   │   │   │   └── validators/  # 请求验证
-│   │   │   ├── services/        # 业务服务层
-│   │   │   │   ├── assistant/   # 助手服务
-│   │   │   │   ├── document/    # 文档服务
-│   │   │   │   ├── conversation/# 对话服务
-│   │   │   │   └── role/        # 角色服务
-│   │   │   ├── agents/          # AgentX 集成
-│   │   │   │   ├── runtime/     # Agent 运行时
-│   │   │   │   └── tools/       # Agent 工具
-│   │   │   ├── promptx/         # PromptX 集成
-│   │   │   │   ├── mcp/         # MCP 协议
-│   │   │   │   ├── roles/       # 角色管理
-│   │   │   │   └── memory/      # 记忆系统
-│   │   │   ├── processing/      # 文档处理
-│   │   │   │   ├── extractors/  # 文本提取器
-│   │   │   │   ├── chunkers/    # 分块器
-│   │   │   │   └── embedders/   # 嵌入生成
-│   │   │   ├── retrieval/       # 向量检索
-│   │   │   │   ├── qdrant/      # Qdrant 客户端
-│   │   │   │   └── search/      # 搜索逻辑
-│   │   │   ├── models/          # 数据模型
-│   │   │   │   └── prisma/      # Prisma 客户端
-│   │   │   ├── config/          # 配置管理
-│   │   │   ├── utils/           # 工具函数
-│   │   │   └── index.ts         # 入口文件
-│   │   ├── prisma/
-│   │   │   ├── schema.prisma    # 数据库 Schema
-│   │   │   ├── migrations/      # 迁移文件
-│   │   │   └── seed.ts          # 种子数据
-│   │   ├── tests/               # 测试文件
-│   │   │   ├── unit/            # 单元测试
-│   │   │   ├── integration/     # 集成测试
-│   │   │   └── e2e/             # 端到端测试
-│   │   ├── package.json
-│   │   ├── tsconfig.json
-│   │   └── .env.example
-│   │
-│   ├── frontend/                # 前端应用
-│   │   ├── src/
-│   │   │   ├── components/      # UI 组件
-│   │   │   │   ├── common/      # 通用组件
-│   │   │   │   ├── assistant/   # 助手相关组件
-│   │   │   │   ├── document/    # 文档相关组件
-│   │   │   │   ├── conversation/# 对话相关组件
-│   │   │   │   └── layout/      # 布局组件
-│   │   │   ├── pages/           # 页面
-│   │   │   │   ├── Home/
-│   │   │   │   ├── Assistant/
-│   │   │   │   ├── Document/
-│   │   │   │   └── Conversation/
-│   │   │   ├── hooks/           # 自定义 Hooks
-│   │   │   ├── services/        # API 服务
-│   │   │   ├── stores/          # 状态管理
-│   │   │   ├── types/           # 类型定义
-│   │   │   ├── utils/           # 工具函数
-│   │   │   ├── App.tsx
-│   │   │   └── main.tsx
-│   │   ├── public/
-│   │   ├── index.html
-│   │   ├── package.json
-│   │   ├── tsconfig.json
-│   │   ├── vite.config.ts
-│   │   └── tailwind.config.js
-│   │
-│   └── shared/                  # 共享代码
+├── apps/
+│   └── web/                          # 主应用（前后端一体）
 │       ├── src/
-│       │   ├── types/           # 共享类型
-│       │   ├── constants/       # 共享常量
-│       │   └── utils/           # 共享工具
+│       │   ├── client/               # 前端代码
+│       │   │   ├── components/       # UI 组件
+│       │   │   │   ├── Layout.tsx    # 布局组件
+│       │   │   │   └── ...
+│       │   │   ├── pages/            # 页面组件
+│       │   │   │   ├── HomePage.tsx
+│       │   │   │   └── NotFoundPage.tsx
+│       │   │   ├── hooks/            # 自定义 Hooks
+│       │   │   ├── stores/           # Zustand 状态
+│       │   │   ├── services/         # API 服务
+│       │   │   ├── App.tsx           # 应用入口
+│       │   │   ├── main.tsx          # 渲染入口
+│       │   │   └── index.css         # 全局样式
+│       │   │
+│       │   └── server/               # 后端代码
+│       │       ├── routes/           # API 路由
+│       │       │   └── assistants.ts # 助手路由
+│       │       ├── services/         # 业务服务
+│       │       │   └── assistant.service.ts
+│       │       ├── repositories/     # 数据访问层
+│       │       │   └── assistant.repository.ts
+│       │       ├── database/         # 数据库
+│       │       │   └── index.ts      # SQLite 初始化
+│       │       ├── middleware/       # 中间件
+│       │       │   ├── auth.ts       # 认证中间件
+│       │       │   ├── error.ts      # 错误处理
+│       │       │   └── logger.ts     # 日志中间件
+│       │       ├── validators/       # 数据验证
+│       │       │   └── assistant.validator.ts
+│       │       ├── errors/           # 错误定义
+│       │       │   └── business.error.ts
+│       │       ├── utils/            # 工具函数
+│       │       │   ├── id.ts         # ID 生成
+│       │       │   ├── logger.ts     # 日志工具
+│       │       │   └── response.ts   # 响应工具
+│       │       ├── processing/       # 文档处理（待实现）
+│       │       ├── retrieval/        # 向量检索（待实现）
+│       │       ├── agentic/          # Agentic 角色系统（待实现）
+│       │       ├── __tests__/        # 测试文件
+│       │       │   ├── setup.ts
+│       │       │   ├── assistant.service.test.ts
+│       │       │   └── assistants.api.test.ts
+│       │       └── index.ts          # 服务器入口
+│       │
+│       ├── public/                   # 静态文件
+│       ├── index.html                # HTML 模板
+│       ├── vite.config.ts            # Vite 配置
+│       ├── vitest.config.ts          # 测试配置
+│       ├── tailwind.config.ts        # Tailwind 配置
+│       ├── postcss.config.js         # PostCSS 配置
+│       ├── tsconfig.json             # TypeScript 配置
 │       └── package.json
 │
-├── spec/                        # 规格文档（已有）
-│   ├── SPEC-*.md
-│   ├── design/
-│   └── features/
+├── packages/
+│   └── shared/                       # 共享包
+│       ├── src/
+│       │   ├── types/                # 共享类型定义
+│       │   │   └── index.ts
+│       │   ├── constants/            # 共享常量
+│       │   │   └── index.ts
+│       │   └── index.ts              # 导出入口
+│       ├── tsconfig.json
+│       └── package.json
 │
-├── docker/                      # Docker 配置
-│   ├── Dockerfile.backend
-│   ├── Dockerfile.frontend
-│   └── docker-compose.yml
+├── spec/                             # 规格文档
+│   ├── SPEC-001-OVERVIEW.md
+│   ├── SPEC-002-ASSISTANT-MANAGEMENT.md
+│   ├── SPEC-003-DOCUMENT-PROCESSING.md
+│   ├── SPEC-004-CONVERSATION-SYSTEM.md
+│   ├── SPEC-005-ROLE-MEMORY.md
+│   ├── design/                       # 设计文档
+│   │   ├── AGENTIC-ARCHITECTURE.md   # Agentic 架构
+│   │   ├── ARCHITECTURE-DESIGN.md
+│   │   ├── TECHNICAL-ARCHITECTURE.md
+│   │   ├── DATA-MODEL.md
+│   │   ├── API-REFERENCE.md
+│   │   └── ...
+│   └── features/                     # Gherkin 特性文件
 │
-├── scripts/                     # 脚本工具
-│   ├── setup.sh                 # 初始化脚本
-│   ├── dev.sh                   # 开发启动脚本
-│   └── deploy.sh                # 部署脚本
+├── openspec/                         # OpenSpec 变更管理
+│   ├── AGENTS.md                     # AI 助手指南
+│   ├── project.md                    # 项目约定
+│   ├── changes/                      # 活跃变更
+│   │   └── archive/                  # 已归档变更
+│   └── specs/                        # 已归档规格
 │
-├── .github/                     # GitHub 配置
-│   └── workflows/
-│       ├── ci.yml               # CI 流程
-│       └── cd.yml               # CD 流程
+├── data/                             # 数据目录（gitignore）
+│   ├── agentic-rag.db                # SQLite 数据库
+│   ├── uploads/                      # 上传文件
+│   └── logs/                         # 日志文件
 │
-├── package.json                 # 根 package.json
-├── pnpm-workspace.yaml          # pnpm 工作区配置
-├── turbo.json                   # Turborepo 配置
+├── docker-compose.yml                # Docker 编排（Qdrant）
+├── .env.example                      # 环境变量示例
 ├── .gitignore
-├── .env.example
+├── .prettierrc
+├── .prettierignore
+├── eslint.config.js
+├── package.json                      # 根 package.json
+├── pnpm-workspace.yaml               # pnpm 工作区配置
+├── pnpm-lock.yaml
+├── AGENTS.md                         # 项目 AI 助手指南
 └── README.md
 ```
 
@@ -141,13 +146,13 @@ agentic-rag/
 |------|------|------|------|
 | 运行时 | Node.js | 20.x LTS | JavaScript 运行环境 |
 | 语言 | TypeScript | 5.x | 类型安全 |
-| Web 框架 | Fastify | 4.x | HTTP 服务器 |
-| ORM | Prisma | 5.x | 数据库访问 |
+| Web 框架 | **Hono** | 4.x | 轻量 HTTP 服务器 |
+| 数据库 | **SQLite** | - | 关系数据存储（better-sqlite3） |
+| 向量数据库 | Qdrant | 1.x | 向量存储和检索 |
 | 验证 | Zod | 3.x | 请求验证 |
 | 日志 | Pino | 8.x | 结构化日志 |
-| 测试 | Vitest | 1.x | 单元测试 |
-| 向量数据库 | @qdrant/js-client-rest | 1.x | Qdrant 客户端 |
-| AI SDK | @anthropic-ai/sdk | 0.x | Claude API |
+| 测试 | Vitest | 2.x | 单元测试 |
+| AI SDK | @anthropic-ai/sdk | - | Claude API |
 | 嵌入 | openai | 4.x | OpenAI Embeddings |
 
 ### 3.2 前端技术栈
@@ -155,26 +160,22 @@ agentic-rag/
 | 类别 | 技术 | 版本 | 用途 |
 |------|------|------|------|
 | 框架 | React | 18.x | UI 框架 |
-| 构建 | Vite | 5.x | 构建工具 |
+| 构建 | Vite | 6.x | 构建工具 |
 | 语言 | TypeScript | 5.x | 类型安全 |
-| 状态管理 | TanStack Query | 5.x | 服务端状态 |
 | 状态管理 | Zustand | 4.x | 客户端状态 |
-| 样式 | Tailwind CSS | 3.x | CSS 框架 |
-| UI 组件 | shadcn/ui | - | 组件库 |
-| 路由 | React Router | 6.x | 路由管理 |
-| 表单 | React Hook Form | 7.x | 表单处理 |
+| 请求 | TanStack Query | 5.x | 服务端状态 |
+| 样式 | Tailwind CSS | 4.x | CSS 框架 |
+| 路由 | React Router | 7.x | 路由管理 |
 | 图标 | Lucide React | - | 图标库 |
 
 ### 3.3 基础设施
 
 | 类别 | 技术 | 版本 | 用途 |
 |------|------|------|------|
-| 主数据库 | PostgreSQL | 15.x | 关系数据存储 |
+| 主数据库 | **SQLite** | - | 关系数据存储 |
 | 向量数据库 | Qdrant | 1.x | 向量存储和检索 |
-| 缓存 | Redis | 7.x | 缓存和会话 |
-| 包管理 | pnpm | 8.x | 包管理器 |
-| Monorepo | Turborepo | 1.x | 构建系统 |
-| 容器 | Docker | 24.x | 容器化 |
+| 包管理 | pnpm | 9.x | 包管理器 |
+| 容器 | Docker | 24.x | 容器化（Qdrant） |
 
 ---
 
@@ -187,179 +188,57 @@ agentic-rag/
 node --version  # 需要 >= 20.0.0
 
 # 检查 pnpm 版本
-pnpm --version  # 需要 >= 8.0.0
+pnpm --version  # 需要 >= 9.0.0
 
-# 检查 Docker 版本
+# 检查 Docker 版本（用于 Qdrant）
 docker --version  # 需要 >= 24.0.0
 ```
 
-### 4.2 创建项目结构
+### 4.2 克隆和安装
 
 ```bash
-# 1. 创建根目录结构
-mkdir -p packages/{backend,frontend,shared}
-mkdir -p docker scripts .github/workflows
-
-# 2. 初始化根 package.json
-pnpm init
-
-# 3. 创建 pnpm 工作区配置
-cat > pnpm-workspace.yaml << 'EOF'
-packages:
-  - 'packages/*'
-EOF
-
-# 4. 创建 Turborepo 配置
-cat > turbo.json << 'EOF'
-{
-  "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": [".env"],
-  "pipeline": {
-    "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
-    },
-    "dev": {
-      "cache": false,
-      "persistent": true
-    },
-    "lint": {},
-    "test": {
-      "dependsOn": ["build"]
-    },
-    "db:migrate": {
-      "cache": false
-    },
-    "db:seed": {
-      "cache": false
-    }
-  }
-}
-EOF
-```
-
-### 4.3 初始化后端
-
-```bash
-cd packages/backend
-
-# 1. 初始化 package.json
-pnpm init
+# 1. 克隆项目
+git clone <repository-url>
+cd agentic-rag
 
 # 2. 安装依赖
-pnpm add fastify @fastify/cors @fastify/multipart @fastify/websocket
-pnpm add @prisma/client zod pino pino-pretty
-pnpm add @qdrant/js-client-rest @anthropic-ai/sdk openai
-pnpm add dotenv
+pnpm install
 
-# 3. 安装开发依赖
-pnpm add -D typescript @types/node tsx vitest
-pnpm add -D prisma eslint prettier
+# 3. 复制环境变量
+cp .env.example .env
 
-# 4. 初始化 TypeScript
-npx tsc --init
-
-# 5. 初始化 Prisma
-npx prisma init
+# 4. 编辑环境变量
+# 填入必要的 API Key
 ```
 
-### 4.4 初始化前端
+### 4.3 启动基础设施
 
 ```bash
-cd packages/frontend
+# 启动 Qdrant 向量数据库
+docker-compose up -d qdrant
 
-# 1. 使用 Vite 创建 React 项目
-pnpm create vite . --template react-ts
-
-# 2. 安装依赖
-pnpm add @tanstack/react-query zustand react-router-dom
-pnpm add react-hook-form @hookform/resolvers zod
-pnpm add lucide-react clsx tailwind-merge
-
-# 3. 安装开发依赖
-pnpm add -D tailwindcss postcss autoprefixer
-pnpm add -D @types/react @types/react-dom
-
-# 4. 初始化 Tailwind
-npx tailwindcss init -p
+# 验证 Qdrant 运行
+curl http://localhost:6333/health
 ```
 
-### 4.5 配置环境变量
+### 4.4 启动开发服务器
 
 ```bash
-# 创建 .env.example
-cat > .env.example << 'EOF'
-# 数据库
-DATABASE_URL=postgresql://user:password@localhost:5432/agentic_rag
+# 启动开发服务器（前后端一体）
+pnpm --filter @agentic-rag/web dev
 
-# Redis
-REDIS_URL=redis://localhost:6379
-
-# Qdrant
-QDRANT_URL=http://localhost:6333
-QDRANT_API_KEY=
-
-# Claude API
-ANTHROPIC_API_KEY=your-api-key
-
-# OpenAI (用于 Embeddings)
-OPENAI_API_KEY=your-api-key
-
-# 应用配置
-NODE_ENV=development
-PORT=3000
-API_KEY=your-api-key
-
-# 前端
-VITE_API_URL=http://localhost:3000/api/v1
-EOF
+# 或使用根目录脚本
+pnpm dev
 ```
 
-### 4.6 启动基础设施
+### 4.5 运行测试
 
 ```bash
-# 创建 docker-compose.yml
-cat > docker/docker-compose.yml << 'EOF'
-version: '3.8'
+# 运行所有测试
+pnpm --filter @agentic-rag/web test
 
-services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: agentic-rag-postgres
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: agentic_rag
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7-alpine
-    container_name: agentic-rag-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: agentic-rag-qdrant
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-    volumes:
-      - qdrant_data:/qdrant/storage
-
-volumes:
-  postgres_data:
-  redis_data:
-  qdrant_data:
-EOF
-
-# 启动服务
-docker-compose -f docker/docker-compose.yml up -d
+# 运行测试并监听变化
+pnpm --filter @agentic-rag/web test:watch
 ```
 
 ---
@@ -371,113 +250,99 @@ docker-compose -f docker/docker-compose.yml up -d
   "name": "agentic-rag",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@8.15.0",
+  "type": "module",
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
-    "db:migrate": "turbo run db:migrate --filter=backend",
-    "db:seed": "turbo run db:seed --filter=backend",
-    "docker:up": "docker-compose -f docker/docker-compose.yml up -d",
-    "docker:down": "docker-compose -f docker/docker-compose.yml down",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "dev": "pnpm --filter @agentic-rag/web dev",
+    "build": "pnpm --filter @agentic-rag/web build",
+    "test": "pnpm --filter @agentic-rag/web test",
+    "lint": "eslint .",
+    "format": "prettier --write ."
   },
   "devDependencies": {
-    "turbo": "^1.13.0"
+    "eslint": "^9.x",
+    "prettier": "^3.x",
+    "typescript": "^5.x"
   }
 }
 ```
 
 ---
 
-## 6. 后端 package.json 配置
+## 6. Web 应用 package.json 配置
 
 ```json
 {
-  "name": "@agentic-rag/backend",
+  "name": "@agentic-rag/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "lint": "eslint src/",
-    "test": "vitest",
-    "test:coverage": "vitest --coverage",
-    "db:migrate": "prisma migrate dev",
-    "db:migrate:deploy": "prisma migrate deploy",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.20.0",
-    "@fastify/cors": "^9.0.0",
-    "@fastify/multipart": "^8.0.0",
-    "@fastify/websocket": "^10.0.0",
-    "@prisma/client": "^5.10.0",
-    "@qdrant/js-client-rest": "^1.8.0",
-    "dotenv": "^16.4.0",
-    "fastify": "^4.26.0",
-    "openai": "^4.28.0",
-    "pino": "^8.19.0",
-    "pino-pretty": "^10.3.0",
-    "zod": "^3.22.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.11.0",
-    "eslint": "^8.56.0",
-    "prettier": "^3.2.0",
-    "prisma": "^5.10.0",
-    "tsx": "^4.7.0",
-    "typescript": "^5.3.0",
-    "vitest": "^1.3.0"
-  }
-}
-```
-
----
-
-## 7. 前端 package.json 配置
-
-```json
-{
-  "name": "@agentic-rag/frontend",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "tsx watch src/server/index.ts",
+    "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint src/"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@hookform/resolvers": "^3.3.0",
-    "@tanstack/react-query": "^5.24.0",
-    "clsx": "^2.1.0",
-    "lucide-react": "^0.344.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-hook-form": "^7.51.0",
-    "react-router-dom": "^6.22.0",
-    "tailwind-merge": "^2.2.0",
-    "zod": "^3.22.0",
-    "zustand": "^4.5.0"
+    // 后端
+    "hono": "^4.x",
+    "@hono/node-server": "^1.x",
+    "better-sqlite3": "^11.x",
+    "zod": "^3.x",
+    "pino": "^9.x",
+    "nanoid": "^5.x",
+
+    // 前端
+    "react": "^18.x",
+    "react-dom": "^18.x",
+    "react-router-dom": "^7.x",
+    "@tanstack/react-query": "^5.x",
+    "zustand": "^4.x",
+    "lucide-react": "^0.x"
   },
   "devDependencies": {
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "@vitejs/plugin-react": "^4.2.0",
-    "autoprefixer": "^10.4.0",
-    "eslint": "^8.56.0",
-    "postcss": "^8.4.0",
-    "tailwindcss": "^3.4.0",
-    "typescript": "^5.3.0",
-    "vite": "^5.1.0"
+    "@types/better-sqlite3": "^7.x",
+    "@types/react": "^18.x",
+    "@types/react-dom": "^18.x",
+    "@vitejs/plugin-react": "^4.x",
+    "autoprefixer": "^10.x",
+    "postcss": "^8.x",
+    "tailwindcss": "^4.x",
+    "tsx": "^4.x",
+    "typescript": "^5.x",
+    "vite": "^6.x",
+    "vitest": "^2.x"
   }
 }
+```
+
+---
+
+## 7. 环境变量配置
+
+创建 `.env` 文件（基于 `.env.example`）：
+
+```bash
+# 服务器配置
+PORT=3000
+NODE_ENV=development
+
+# 数据库
+DATABASE_PATH=./data/agentic-rag.db
+
+# 向量数据库
+QDRANT_URL=http://localhost:6333
+
+# AI 服务
+ANTHROPIC_API_KEY=your-anthropic-api-key
+OPENAI_API_KEY=your-openai-api-key
+
+# 认证（MVP 阶段简化）
+API_KEY=your-api-key
+
+# 嵌入模型
+EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_DIMENSIONS=1536
 ```
 
 ---
@@ -487,30 +352,46 @@ docker-compose -f docker/docker-compose.yml up -d
 ### 8.1 环境验证
 
 - [ ] Node.js >= 20.0.0
-- [ ] pnpm >= 8.0.0
-- [ ] Docker >= 24.0.0
-- [ ] Docker Compose 可用
+- [ ] pnpm >= 9.0.0
+- [ ] Docker >= 24.0.0（用于 Qdrant）
 
 ### 8.2 基础设施验证
 
-- [ ] PostgreSQL 可连接（端口 5432）
-- [ ] Redis 可连接（端口 6379）
 - [ ] Qdrant 可连接（端口 6333）
+- [ ] SQLite 数据库文件可创建
 
 ### 8.3 项目验证
 
 - [ ] `pnpm install` 成功
-- [ ] `pnpm dev` 可启动
-- [ ] 数据库迁移成功
-- [ ] API 健康检查通过
+- [ ] `pnpm dev` 可启动开发服务器
+- [ ] `pnpm test` 测试通过
+- [ ] 访问 http://localhost:3000 显示前端页面
+- [ ] 访问 http://localhost:3000/api/v1/health 返回健康状态
 
 ---
 
-## 9. 下一步
+## 9. 常见问题
 
-1. 按照本文档创建项目结构
-2. 参考 [开发环境配置](./DEV-ENVIRONMENT.md) 配置开发环境
-3. 参考 [实现路线图](./IMPLEMENTATION-ROADMAP.md) 开始开发
+### Q: 为什么使用 SQLite 而不是 PostgreSQL？
+
+A: MVP 阶段使用 SQLite 简化部署，无需额外的数据库服务。后期可迁移到 PostgreSQL。
+
+### Q: 为什么前后端在同一个应用中？
+
+A: 简化开发和部署。Vite 开发服务器代理 API 请求到 Hono 后端。
+
+### Q: 如何添加新的 API 路由？
+
+A:
+1. 在 `apps/web/src/server/routes/` 创建路由文件
+2. 在 `apps/web/src/server/index.ts` 注册路由
+
+### Q: 如何运行特定测试？
+
+A:
+```bash
+pnpm --filter @agentic-rag/web vitest run src/server/__tests__/assistant.service.test.ts
+```
 
 ---
 
@@ -519,3 +400,4 @@ docker-compose -f docker/docker-compose.yml up -d
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
 | 1.0.0 | 2024-12-16 | 初始版本 |
+| 2.0.0 | 2024-12-17 | 更新为实际项目结构（Hono/SQLite/前后端一体） |

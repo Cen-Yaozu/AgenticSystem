@@ -1,8 +1,8 @@
 # API 参考文档
 
-> **版本**: 1.0.0  
-> **状态**: Draft  
-> **最后更新**: 2024-12-16
+> **版本**: 2.0.0
+> **状态**: Draft
+> **最后更新**: 2024-12-17
 
 ---
 
@@ -244,6 +244,58 @@ DELETE /assistants/:assistantId
 
 **响应**: 204 No Content
 
+### 3.6 获取助手 PromptX 资源
+
+获取助手工作区中的 PromptX 资源（角色、工具）。
+
+```http
+GET /assistants/:assistantId/resources
+```
+
+**查询参数**:
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| focus | string | 否 | 聚焦范围：all(默认)、roles、tools |
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "roles": [
+      {
+        "id": "ast_xxx-assistant",
+        "name": "法律助手",
+        "domain": "legal",
+        "source": "project"
+      }
+    ],
+    "tools": [
+      {
+        "name": "pdf-reader",
+        "description": "读取 PDF 文件",
+        "source": "system"
+      },
+      {
+        "name": "word-tool",
+        "description": "读取 Word 文件",
+        "source": "system"
+      },
+      {
+        "name": "excel-tool",
+        "description": "读取 Excel 文件",
+        "source": "system"
+      }
+    ]
+  }
+}
+```
+
+**说明**:
+- `source: "system"` - PromptX 系统内置资源
+- `source: "project"` - 工作区中定义的资源
+- 内部实现：调用 PromptX 的 `promptx_discover` MCP 方法
+
 ---
 
 ## 4. 文档管理 API
@@ -400,95 +452,80 @@ DELETE /conversations/:conversationId
 
 ---
 
-## 6. 角色管理 API
+## 6. PromptX MCP 集成
 
-### 6.1 获取角色列表
+> **重要说明**：角色和记忆功能由 PromptX 提供，通过 MCP 协议访问，不是本项目的 REST API。
 
-```http
-GET /assistants/:assistantId/roles
+### 6.1 概述
+
+本项目不提供角色管理和记忆管理的 REST API。这些功能由 PromptX 通过 MCP（Model Context Protocol）协议提供。
+
+### 6.2 PromptX MCP 调用
+
+在对话过程中，Agent 框架通过 MCP 协议调用 PromptX：
+
+#### 激活角色
+
+```typescript
+// 激活助手角色
+await mcpClient.call('promptx_action', {
+  role: 'legal-assistant'
+});
+
+// 激活子代理角色
+await mcpClient.call('promptx_action', {
+  role: 'retriever'
+});
 ```
 
-### 6.2 创建角色
+#### 保存记忆
 
-```http
-POST /assistants/:assistantId/roles
+```typescript
+await mcpClient.call('promptx_remember', {
+  role: 'legal-assistant',
+  engrams: [{
+    content: '用户偏好详细的风险分析报告',
+    schema: '用户 偏好 详细 风险分析 报告',
+    strength: 0.8,
+    type: 'ATOMIC'
+  }]
+});
 ```
 
-**请求体**:
-```json
-{
-  "name": "合同风险分析师",
-  "description": "专门分析合同中的法律风险",
-  "promptTemplate": "你是一位专业的合同风险分析师...",
-  "capabilities": ["风险识别", "条款分析"]
-}
+#### 检索记忆
+
+```typescript
+// DMN 模式 - 查看记忆全景
+await mcpClient.call('promptx_recall', {
+  role: 'legal-assistant',
+  query: null,
+  mode: 'balanced'
+});
+
+// 关键词模式
+await mcpClient.call('promptx_recall', {
+  role: 'legal-assistant',
+  query: '风险分析 报告',
+  mode: 'focused'
+});
 ```
 
-### 6.3 激活/停用角色
+### 6.3 相关文档
 
-```http
-PATCH /roles/:roleId/status
-```
-
-**请求体**:
-```json
-{
-  "isActive": true
-}
-```
+- [SPEC-005 PromptX 角色与记忆集成](../SPEC-005-ROLE-MEMORY.md)
+- [Agentic 架构设计](./AGENTIC-ARCHITECTURE.md)
 
 ---
 
-## 7. 记忆管理 API
+## 7. WebSocket 事件
 
-### 7.1 获取角色记忆
-
-```http
-GET /roles/:roleId/memories?type=preference&limit=20
-```
-
-### 7.2 创建记忆
-
-```http
-POST /roles/:roleId/memories
-```
-
-**请求体**:
-```json
-{
-  "type": "preference",
-  "content": "用户偏好详细的风险分析报告",
-  "schema": "用户 偏好 详细 风险分析 报告",
-  "strength": 0.8
-}
-```
-
-### 7.3 检索记忆
-
-```http
-POST /roles/:roleId/memories/recall
-```
-
-**请求体**:
-```json
-{
-  "query": "风险分析 报告",
-  "mode": "balanced",
-  "limit": 10
-}
-```
-
----
-
-## 8. WebSocket 事件
-
-### 8.1 连接
+### 7.1 连接
 
 ```
 ws://localhost:3000/ws?token=<auth_token>
 ```
 
-### 8.2 事件类型
+### 7.2 事件类型
 
 #### 文档处理事件
 
@@ -549,3 +586,4 @@ ws://localhost:3000/ws?token=<auth_token>
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
 | 1.0.0 | 2024-12-16 | 从 SPEC-007 提取，独立为设计文档 |
+| 2.0.0 | 2024-12-17 | 移除角色/记忆 REST API，改为 PromptX MCP 集成说明 |

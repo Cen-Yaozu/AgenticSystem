@@ -50,6 +50,7 @@ export interface Assistant {
   status: 'initializing' | 'ready' | 'processing' | 'error';
   documentCount: number;
   conversationCount: number;
+  workspacePath?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

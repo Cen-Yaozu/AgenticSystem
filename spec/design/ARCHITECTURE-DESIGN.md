@@ -1,7 +1,7 @@
 # 架构设计文档
 
-> **版本**: 1.0.0  
-> **状态**: Draft  
+> **版本**: 2.0.0
+> **状态**: Draft
 > **最后更新**: 2024-12-17
 
 ---
@@ -9,6 +9,8 @@
 ## 1. 概述
 
 本文档定义 AgentX Agentic RAG 系统的整体架构设计，包括技术选型、项目结构、数据库设计和 API 设计。
+
+> **重要**: 本系统采用 **Agentic 多角色架构**，详细设计请参阅 [AGENTIC-ARCHITECTURE.md](./AGENTIC-ARCHITECTURE.md)。
 
 ### 1.1 设计目标
 
@@ -18,6 +20,7 @@
 | **可扩展** | 架构支持后续扩展（多租户、分布式） |
 | **可维护** | 清晰的分层，易于理解和修改 |
 | **高性能** | 流式响应，异步处理 |
+| **智能** | Agentic 多角色协作，越用越智能 |
 
 ### 1.2 参考项目
 
@@ -26,6 +29,16 @@
 - SQLite 作为 MVP 数据库
 - 前后端一体的项目结构
 - JWT 认证方案
+
+### 1.3 架构文档体系
+
+| 文档 | 描述 |
+|------|------|
+| **本文档** | 整体架构设计（技术选型、项目结构、数据库、API） |
+| [AGENTIC-ARCHITECTURE.md](./AGENTIC-ARCHITECTURE.md) | **Agentic 多角色架构**（核心设计） |
+| [TECHNICAL-ARCHITECTURE.md](./TECHNICAL-ARCHITECTURE.md) | 技术架构（分层、部署、性能） |
+| [DATA-MODEL.md](./DATA-MODEL.md) | 数据模型设计 |
+| [API-REFERENCE.md](./API-REFERENCE.md) | API 参考文档 |
 
 ---
 
@@ -296,7 +309,7 @@ CREATE TABLE assistants (
   conversation_count INTEGER DEFAULT 0,   -- 对话数量
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  
+
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   UNIQUE(user_id, name)
 );
@@ -321,7 +334,7 @@ CREATE TABLE documents (
   metadata TEXT DEFAULT '{}',             -- 元数据 (JSON)
   uploaded_at INTEGER NOT NULL,
   processed_at INTEGER,
-  
+
   FOREIGN KEY (assistant_id) REFERENCES assistants(id) ON DELETE CASCADE
 );
 
@@ -339,7 +352,7 @@ CREATE TABLE conversations (
   message_count INTEGER DEFAULT 0,        -- 消息数量
   started_at INTEGER NOT NULL,
   last_message_at INTEGER NOT NULL,
-  
+
   FOREIGN KEY (assistant_id) REFERENCES assistants(id) ON DELETE CASCADE
 );
 
@@ -357,7 +370,7 @@ CREATE TABLE messages (
   content TEXT NOT NULL,                  -- 消息内容
   metadata TEXT DEFAULT '{}',             -- 元数据 (JSON): sources, tokens
   created_at INTEGER NOT NULL,
-  
+
   FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 );
 
@@ -380,7 +393,7 @@ CREATE TABLE roles (
   usage_count INTEGER DEFAULT 0,          -- 使用次数
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  
+
   FOREIGN KEY (assistant_id) REFERENCES assistants(id) ON DELETE CASCADE,
   UNIQUE(assistant_id, name)
 );
@@ -400,7 +413,7 @@ CREATE TABLE memories (
   access_count INTEGER DEFAULT 0,         -- 访问次数
   created_at INTEGER NOT NULL,
   last_accessed_at INTEGER,
-  
+
   FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
 );
 
@@ -801,7 +814,8 @@ const createAssistantSchema = z.object({
 
 | 文档 | 关系 |
 |------|------|
-| [TECHNICAL-ARCHITECTURE.md](./TECHNICAL-ARCHITECTURE.md) | 本文档是其简化和更新版本 |
+| [AGENTIC-ARCHITECTURE.md](./AGENTIC-ARCHITECTURE.md) | **核心** - Agentic 多角色架构设计 |
+| [TECHNICAL-ARCHITECTURE.md](./TECHNICAL-ARCHITECTURE.md) | 技术架构（已更新与本文档对齐） |
 | [DATA-MODEL.md](./DATA-MODEL.md) | 本文档的数据库设计与其一致，但使用 SQLite |
 | [API-REFERENCE.md](./API-REFERENCE.md) | 本文档的 API 设计与其一致 |
 | [PROJECT-SETUP.md](./PROJECT-SETUP.md) | 项目初始化指南 |
@@ -815,3 +829,4 @@ const createAssistantSchema = z.object({
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
 | 1.0.0 | 2024-12-17 | 初始版本，基于 Agent 项目架构设计 |
+| 2.0.0 | 2024-12-17 | 添加 Agentic 架构引用，更新文档体系 |

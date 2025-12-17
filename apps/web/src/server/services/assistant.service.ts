@@ -16,6 +16,8 @@ import {
   assistantRepository,
   type FindAssistantsOptions
 } from '../repositories/assistant.repository.js';
+import { logger } from '../utils/logger.js';
+import { workspaceService } from './workspace.service.js';
 
 /**
  * 助手服务类
@@ -41,7 +43,7 @@ export class AssistantService {
       throw new AssistantLimitExceededError(MAX_ASSISTANTS_PER_USER);
     }
 
-    // 创建助手
+    // 先创建助手记录（获取 ID）
     const assistant = assistantRepository.create({
       userId,
       name: input.name,
@@ -50,12 +52,28 @@ export class AssistantService {
       settings: input.settings,
     });
 
+    // 创建工作区目录
+    try {
+      const workspace = await workspaceService.createWorkspace(assistant.id);
+      // 更新助手的工作区路径
+      assistantRepository.update(assistant.id, {
+        workspacePath: workspace.path,
+      });
+      logger.info({ assistantId: assistant.id, workspacePath: workspace.path }, 'Workspace created for assistant');
+    } catch (error) {
+      // 工作区创建失败，删除已创建的助手记录
+      logger.error({ err: error, assistantId: assistant.id }, 'Failed to create workspace, rolling back assistant creation');
+      assistantRepository.delete(assistant.id);
+      throw error;
+    }
+
     // 异步标记为 ready（MVP 阶段直接标记，生产环境应在初始化完成后标记）
     setTimeout(() => {
       assistantRepository.markAsReady(assistant.id);
     }, 100);
 
-    return assistant;
+    // 重新获取助手信息（包含 workspacePath）
+    return assistantRepository.findById(assistant.id)!;
   }
 
   /**
@@ -146,6 +164,15 @@ export class AssistantService {
     // 检查状态：processing 时不能删除
     if (assistant.status === ASSISTANT_STATUS.PROCESSING) {
       throw new AssistantCannotDeleteError('Cannot delete assistant while it is processing');
+    }
+
+    // 先删除工作区目录
+    try {
+      await workspaceService.deleteWorkspace(assistantId);
+      logger.info({ assistantId }, 'Workspace deleted for assistant');
+    } catch (error) {
+      // 工作区删除失败，记录日志但继续删除助手记录
+      logger.error({ err: error, assistantId }, 'Failed to delete workspace, continuing with assistant deletion');
     }
 
     // 删除助手（数据库外键约束会级联删除关联数据）

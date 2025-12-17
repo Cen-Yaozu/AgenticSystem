@@ -88,6 +88,7 @@ async function runMigrations(): Promise<void> {
   const migrations = [
     { name: '001_initial_schema', sql: getInitialSchema() },
     { name: '002_default_user', sql: getDefaultUserMigration() },
+    { name: '003_add_workspace_path', sql: getWorkspacePathMigration() },
   ];
 
   // 应用未执行的迁移
@@ -250,6 +251,17 @@ function getDefaultUserMigration(): string {
       CURRENT_TIMESTAMP,
       CURRENT_TIMESTAMP
     );
+  `;
+}
+
+/**
+ * 工作区路径迁移
+ * 为 assistants 表添加 workspace_path 字段
+ */
+function getWorkspacePathMigration(): string {
+  return `
+    -- 添加工作区路径字段到 assistants 表
+    ALTER TABLE assistants ADD COLUMN workspace_path TEXT;
   `;
 }
 

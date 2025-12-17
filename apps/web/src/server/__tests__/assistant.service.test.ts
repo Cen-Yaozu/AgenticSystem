@@ -40,6 +40,7 @@ function createTestSchema(db: Database.Database): void {
       status TEXT DEFAULT 'initializing' CHECK (status IN ('initializing', 'ready', 'processing', 'error')),
       document_count INTEGER DEFAULT 0,
       conversation_count INTEGER DEFAULT 0,
+      workspace_path TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
@@ -63,6 +64,22 @@ function createTestSchema(db: Database.Database): void {
 // Mock 数据库模块 - 必须在导入 AssistantService 之前
 vi.mock('../database/index.js', () => ({
   getDatabase: vi.fn(() => testDb),
+}));
+
+// Mock 工作区服务
+vi.mock('../services/workspace.service.js', () => ({
+  workspaceService: {
+    createWorkspace: vi.fn().mockResolvedValue({
+      assistantId: 'test-assistant-id',
+      path: '/test/workspaces/test-assistant-id',
+      promptxResourcePath: '/test/workspaces/test-assistant-id/.promptx/resource',
+      mcpConfigPath: '/test/workspaces/test-assistant-id/mcp.json',
+      documentsPath: '/test/workspaces/test-assistant-id/documents',
+    }),
+    deleteWorkspace: vi.fn().mockResolvedValue(undefined),
+    getWorkspacePath: vi.fn().mockReturnValue('/test/workspaces/test-assistant-id'),
+    workspaceExists: vi.fn().mockReturnValue(true),
+  },
 }));
 
 // 导入错误类型
@@ -117,6 +134,7 @@ describe('AssistantService', () => {
       expect(result.status).toBe('initializing');
       expect(result.settings).toBeDefined();
       expect(result.settings.language).toBe('zh-CN');
+      expect(result.workspacePath).toBeDefined();
     });
 
     it('应该使用默认设置创建助手', async () => {

@@ -16,6 +16,7 @@ interface AssistantRow {
   status: string;
   document_count: number;
   conversation_count: number;
+  workspace_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -29,6 +30,7 @@ export interface CreateAssistantData {
   description?: string;
   domain?: string;
   settings?: Partial<AssistantSettings>;
+  workspacePath?: string;
 }
 
 /**
@@ -40,6 +42,7 @@ export interface UpdateAssistantData {
   domain?: string | null;
   settings?: Partial<AssistantSettings>;
   status?: Assistant['status'];
+  workspacePath?: string | null;
 }
 
 /**
@@ -65,6 +68,7 @@ function rowToAssistant(row: AssistantRow): Assistant {
     status: row.status as Assistant['status'],
     documentCount: row.document_count,
     conversationCount: row.conversation_count,
+    workspacePath: row.workspace_path || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -164,8 +168,8 @@ export class AssistantRepository {
     };
 
     const sql = `
-      INSERT INTO assistants (id, user_id, name, description, domain, settings, status, document_count, conversation_count, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
+      INSERT INTO assistants (id, user_id, name, description, domain, settings, status, document_count, conversation_count, workspace_path, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)
     `;
 
     db.prepare(sql).run(
@@ -176,6 +180,7 @@ export class AssistantRepository {
       data.domain || null,
       JSON.stringify(settings),
       ASSISTANT_STATUS.INITIALIZING,
+      data.workspacePath || null,
       now,
       now
     );
@@ -227,6 +232,11 @@ export class AssistantRepository {
     if (data.status !== undefined) {
       updates.push('status = ?');
       params.push(data.status);
+    }
+
+    if (data.workspacePath !== undefined) {
+      updates.push('workspace_path = ?');
+      params.push(data.workspacePath || null);
     }
 
     params.push(id);
