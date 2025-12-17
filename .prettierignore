@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+
+# Turbo
+.turbo/
+
+# Coverage
+coverage/
+
+# Lock files
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Generated files
+*.min.js
+*.min.css
+
+# Markdown (optional, can be formatted)
+# *.md
+
+# Data files
+*.db
+*.sqlite

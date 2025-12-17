@@ -1,0 +1,40 @@
+{
+  "name": "agentic-rag",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AgentX Agentic RAG - 智能助手平台",
+  "type": "module",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "db:migrate": "turbo run db:migrate",
+    "prepare": "echo 'Ready to develop!'"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.10",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "keywords": [
+    "rag",
+    "ai",
+    "assistant",
+    "llm",
+    "vector-database"
+  ],
+  "author": "AgentX Team",
+  "license": "MIT"
+}

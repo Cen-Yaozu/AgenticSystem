@@ -1,0 +1,36 @@
+{
+  "recommendations": [
+    // 必需扩展
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+
+    // TypeScript
+    "ms-vscode.vscode-typescript-next",
+
+    // React & Tailwind
+    "bradlc.vscode-tailwindcss",
+    "dsznajder.es7-react-js-snippets",
+
+    // 数据库
+    "qwtel.sqlite-viewer",
+
+    // Docker
+    "ms-azuretools.vscode-docker",
+
+    // Git
+    "eamodio.gitlens",
+
+    // 其他实用工具
+    "christian-kohler.path-intellisense",
+    "streetsidesoftware.code-spell-checker",
+    "usernamehw.errorlens",
+    "gruntfuggly.todo-tree",
+
+    // API 测试
+    "humao.rest-client",
+
+    // Markdown
+    "yzhang.markdown-all-in-one"
+  ],
+  "unwantedRecommendations": []
+}
