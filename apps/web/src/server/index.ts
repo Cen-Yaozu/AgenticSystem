@@ -10,6 +10,7 @@ import { initDatabase } from './database/index.js';
 import { errorHandler } from './middleware/error.js';
 import { requestLogger } from './middleware/logger.js';
 import assistantsRoutes from './routes/assistants.js';
+import documentsRoutes from './routes/documents.js';
 import { logger } from './utils/logger.js';
 
 // 加载环境变量（从项目根目录）
@@ -55,6 +56,9 @@ app.get('/api', (c) => {
 
 // 挂载助手路由
 app.route('/api/v1/assistants', assistantsRoutes);
+
+// 挂载文档路由（嵌套在助手下）
+app.route('/api/v1/assistants/:assistantId/documents', documentsRoutes);
 
 // 404 处理
 app.notFound((c) => {

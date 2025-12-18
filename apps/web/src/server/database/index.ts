@@ -89,6 +89,7 @@ async function runMigrations(): Promise<void> {
     { name: '001_initial_schema', sql: getInitialSchema() },
     { name: '002_default_user', sql: getDefaultUserMigration() },
     { name: '003_add_workspace_path', sql: getWorkspacePathMigration() },
+    { name: '004_add_document_fields', sql: getDocumentFieldsMigration() },
   ];
 
   // 应用未执行的迁移
@@ -262,6 +263,19 @@ function getWorkspacePathMigration(): string {
   return `
     -- 添加工作区路径字段到 assistants 表
     ALTER TABLE assistants ADD COLUMN workspace_path TEXT;
+  `;
+}
+
+/**
+ * 文档字段迁移
+ * 为 documents 表添加 file_path 和 retry_count 字段
+ */
+function getDocumentFieldsMigration(): string {
+  return `
+    -- 添加文件路径字段到 documents 表
+    ALTER TABLE documents ADD COLUMN file_path TEXT;
+    -- 添加重试次数字段到 documents 表
+    ALTER TABLE documents ADD COLUMN retry_count INTEGER DEFAULT 0;
   `;
 }
 

@@ -76,19 +76,88 @@ export interface UpdateAssistantInput {
 export type DocumentStatus = 'uploading' | 'queued' | 'processing' | 'completed' | 'failed';
 export type FileType = 'pdf' | 'docx' | 'txt' | 'md' | 'xlsx';
 
+export interface DocumentMetadata {
+  title?: string;
+  author?: string;
+  pageCount?: number;
+  [key: string]: unknown;
+}
+
 export interface Document {
   id: ID;
   assistantId: ID;
   filename: string;
   fileType: FileType;
   fileSize: number;
+  filePath: string;
   status: DocumentStatus;
   progress: number;
   errorMessage?: string;
   chunkCount: number;
-  metadata: Record<string, unknown>;
+  retryCount: number;
+  metadata: DocumentMetadata;
   uploadedAt: Timestamp;
   processedAt?: Timestamp;
+}
+
+export interface CreateDocumentInput {
+  filename: string;
+  fileType: FileType;
+  fileSize: number;
+  filePath: string;
+}
+
+export interface UpdateDocumentInput {
+  status?: DocumentStatus;
+  progress?: number;
+  errorMessage?: string | null;
+  chunkCount?: number;
+  retryCount?: number;
+  metadata?: DocumentMetadata;
+  processedAt?: Timestamp;
+}
+
+export interface DocumentListParams extends PaginationParams {
+  status?: DocumentStatus;
+}
+
+// ============================================
+// 文档处理相关类型
+// ============================================
+
+export interface ParseResult {
+  success: boolean;
+  content: string;
+  metadata: DocumentMetadata;
+  error?: string;
+}
+
+export interface DocumentChunk {
+  id: string;
+  documentId: ID;
+  content: string;
+  chunkIndex: number;
+  startPosition: number;
+  endPosition: number;
+}
+
+export interface VectorPoint {
+  id: string;
+  vector: number[];
+  payload: {
+    documentId: string;
+    documentName: string;
+    content: string;
+    chunkIndex: number;
+    startPosition: number;
+    endPosition: number;
+  };
+}
+
+export interface ProcessingProgress {
+  stage: 'validation' | 'extraction' | 'cleaning' | 'chunking' | 'embedding' | 'indexing';
+  progress: number;
+  message?: string;
 }
 
 // ============================================

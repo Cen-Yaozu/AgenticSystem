@@ -1,18 +1,18 @@
 # SPEC-003: 文档处理
 
-> 版本: 4.0 | 状态: Draft | 日期: 2024-12-17
+> 版本: 5.0 | 状态: Draft | 日期: 2024-12-17
 
 ## 1. 概述
 
 **目的**：定义文档处理系统的完整规格，包括上传、解析、向量化和管理。
 
 **核心技术**：
-- 文档读取：PromptX 工具（pdf-reader, word-tool, excel-tool）
-- 向量化：自定义 PromptX 工具或直接调用 Embedding API
+- 文档读取：复用 `promptx-agenticRag/collector` 的成熟解析器
+- 向量化：直接调用 Embedding API（OpenAI text-embedding-3-small）
 - 向量存储：Qdrant
 
 **范围**：
-- 包含：文档上传、文本提取（PromptX 工具）、分块、向量化、索引存储
+- 包含：文档上传、文本提取（复用 collector 解析器）、分块、向量化、索引存储
 - 不包含：对话检索逻辑（见 SPEC-004）
 
 **相关文档**：
@@ -57,13 +57,13 @@
 
 ## 5. 支持的文档格式
 
-| 格式 | MIME 类型 | 扩展名 | 处理方式 |
-|------|-----------|--------|----------|
-| PDF | application/pdf | .pdf | pdf-parse |
-| Word | application/vnd.openxmlformats-officedocument.wordprocessingml.document | .docx | mammoth |
-| 纯文本 | text/plain | .txt | 直接读取 |
-| Markdown | text/markdown | .md | 直接读取 |
-| Excel | application/vnd.openxmlformats-officedocument.spreadsheetml.sheet | .xlsx | xlsx |
+| 格式 | MIME 类型 | 扩展名 | 处理方式 | 复用来源 |
+|------|-----------|--------|----------|----------|
+| PDF | application/pdf | .pdf | pdf-parse + OCR 回退 | collector/processSingleFile/convert/asPDF/ |
+| Word | application/vnd.openxmlformats-officedocument.wordprocessingml.document | .docx | langchain DocxLoader | collector/processSingleFile/convert/asDocx.js |
+| 纯文本 | text/plain | .txt | 直接读取 | collector/processSingleFile/convert/asTxt.js |
+| Markdown | text/markdown | .md | 直接读取 | collector/processSingleFile/convert/asTxt.js |
+| Excel | application/vnd.openxmlformats-officedocument.spreadsheetml.sheet | .xlsx | node-xlsx | collector/processSingleFile/convert/asXlsx.js |
 
 ## 6. 处理流水线
 
@@ -80,51 +80,91 @@
 │    │      │      │      │      │      └─ Embedding API                      │
 │    │      │      │      │      └─ 固定字符分块 (1000字符/块)                 │
 │    │      │      │      └─ 去噪、标准化                                      │
-│    │      │      └─ PromptX 工具（pdf-reader/word-tool/excel-tool）         │
+│    │      │      └─ 复用 collector 解析器（TypeScript 重写）                 │
 │    │      └─ 格式、大小验证                                                  │
 │    └─ 文件接收                                                               │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 6.2 PromptX 工具调用
+### 6.2 复用 collector 解析器
 
-文档提取使用 PromptX 的工具系统：
+文档提取复用 `promptx-agenticRag/collector` 的成熟实现，重写为 TypeScript：
 
 ```typescript
-// 使用 PromptX toolx 调用 pdf-reader
-await mcpClient.call('toolx', {
-  yaml: `tool: tool://pdf-reader
-mode: execute
-parameters:
-  path: /path/to/document.pdf
-  action: extract`
-});
+// 解析器接口
+interface DocumentParser {
+  parse(filePath: string): Promise<ParseResult>;
+}
 
-// 使用 word-tool 读取 Word 文档
-await mcpClient.call('toolx', {
-  yaml: `tool: tool://word-tool
-mode: execute
-parameters:
-  path: /path/to/document.docx
-  action: read`
-});
+interface ParseResult {
+  content: string;
+  metadata: {
+    title?: string;
+    author?: string;
+    pageCount?: number;
+  };
+}
 
-// 使用 excel-tool 读取 Excel 文件
-await mcpClient.call('toolx', {
-  yaml: `tool: tool://excel-tool
-mode: execute
-parameters:
-  path: /path/to/document.xlsx
-  action: read`
-});
+// PDF 解析器（复用 collector/processSingleFile/convert/asPDF/）
+class PdfParser implements DocumentParser {
+  async parse(filePath: string): Promise<ParseResult> {
+    // 使用 pdf-parse 提取文本
+    // 如果提取失败，回退到 OCR（tesseract.js）
+    const pdfParse = require('pdf-parse');
+    const dataBuffer = fs.readFileSync(filePath);
+    const data = await pdfParse(dataBuffer);
+    return {
+      content: data.text,
+      metadata: {
+        title: data.info?.Title,
+        author: data.info?.Author,
+        pageCount: data.numpages
+      }
+    };
+  }
+}
+
+// DOCX 解析器（复用 collector/processSingleFile/convert/asDocx.js）
+class DocxParser implements DocumentParser {
+  async parse(filePath: string): Promise<ParseResult> {
+    // 使用 langchain DocxLoader
+    const { DocxLoader } = require('@langchain/community/document_loaders/fs/docx');
+    const loader = new DocxLoader(filePath);
+    const docs = await loader.load();
+    return {
+      content: docs.map(d => d.pageContent).join('\n'),
+      metadata: {}
+    };
+  }
+}
+
+// XLSX 解析器（复用 collector/processSingleFile/convert/asXlsx.js）
+class XlsxParser implements DocumentParser {
+  async parse(filePath: string): Promise<ParseResult> {
+    // 使用 node-xlsx
+    const xlsx = require('node-xlsx');
+    const workbook = xlsx.parse(filePath);
+    const content = workbook
+      .map(sheet => sheet.data.map(row => row.join('\t')).join('\n'))
+      .join('\n\n');
+    return { content, metadata: {} };
+  }
+}
+
+// TXT/MD 解析器（复用 collector/processSingleFile/convert/asTxt.js）
+class TextParser implements DocumentParser {
+  async parse(filePath: string): Promise<ParseResult> {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    return { content, metadata: {} };
+  }
+}
 ```
 
 ### 6.3 向量化
 
-向量化可以通过以下方式实现：
+直接调用 OpenAI Embedding API：
 
-**方式一：直接调用 Embedding API**
 ```typescript
 // 调用 OpenAI Embedding API
 const response = await openai.embeddings.create({
@@ -132,18 +172,6 @@ const response = await openai.embeddings.create({
   input: chunkText,
 });
 const vector = response.data[0].embedding;
-```
-
-**方式二：自定义 PromptX 工具（可选）**
-```typescript
-// 创建自定义向量化工具
-await mcpClient.call('toolx', {
-  yaml: `tool: tool://vectorizer
-mode: execute
-parameters:
-  text: "${chunkText}"
-  model: "text-embedding-3-small"`
-});
 ```
 
 ### 6.4 处理流程详解
@@ -163,12 +191,12 @@ parameters:
 │     • 检查文件类型（PDF/DOCX/TXT/MD/XLSX）                                  │
 │     • 更新状态（status: queued）                                            │
 │                                                                             │
-│  3. 文本提取（PromptX 工具）                                                │
-│     • 根据文件类型选择工具                                                  │
-│       - PDF → pdf-reader                                                   │
-│       - DOCX → word-tool                                                   │
-│       - XLSX → excel-tool                                                  │
-│       - TXT/MD → 直接读取                                                  │
+│  3. 文本提取（复用 collector 解析器）                                       │
+│     • 根据文件类型选择解析器                                                │
+│       - PDF → PdfParser（pdf-parse + OCR 回退）                            │
+│       - DOCX → DocxParser（langchain DocxLoader）                          │
+│       - XLSX → XlsxParser（node-xlsx）                                     │
+│       - TXT/MD → TextParser（直接读取）                                    │
 │     • 更新状态（status: processing）                                        │
 │                                                                             │
 │  4. 文本清理                                                                │
@@ -286,11 +314,22 @@ interface Document {
 | 失败重试 | 最多 3 次 |
 | 进度更新延迟 | < 1s |
 
-## 12. 实现路线图
+## 12. 依赖库
+
+| 库 | 用途 | 来源 |
+|----|------|------|
+| pdf-parse | PDF 文本提取 | collector |
+| @langchain/community | DOCX 解析（DocxLoader） | collector |
+| node-xlsx | Excel 解析 | collector |
+| tesseract.js | PDF OCR 回退（可选） | collector |
+| @qdrant/js-client-rest | 向量数据库客户端 | 新增 |
+| openai | Embedding API | 新增 |
+
+## 13. 实现路线图
 
 ### Phase 1: 基础处理（MVP）
 - [ ] 文件上传和验证
-- [ ] PromptX 工具集成（pdf-reader, word-tool, excel-tool）
+- [ ] 复用 collector 解析器（TypeScript 重写）
 - [ ] 固定字符分块
 - [ ] Embedding API 向量化
 - [ ] Qdrant 存储
@@ -318,3 +357,4 @@ interface Document {
 | 3.0 | 2024-12-17 | 添加 Agentic 处理流程 |
 | 3.1 | 2024-12-17 | 更新术语：子角色→子代理，添加多实例架构说明 |
 | 4.0 | 2024-12-17 | 简化为 PromptX 工具集成，移除复杂的子代理架构 |
+| 5.0 | 2024-12-17 | 改为复用 collector 解析器，更简单高效 |
