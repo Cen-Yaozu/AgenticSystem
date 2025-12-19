@@ -27,10 +27,10 @@ export interface User {
 }
 
 // ============================================
-// 助手相关类型
+// 领域相关类型
 // ============================================
 
-export interface AssistantSettings {
+export interface DomainSettings {
   responseStyle: 'detailed' | 'concise';
   tone: 'formal' | 'friendly';
   language: string;
@@ -40,33 +40,46 @@ export interface AssistantSettings {
   retrievalThreshold: number;
 }
 
-export interface Assistant {
+export type DomainStatus = 'initializing' | 'ready' | 'processing' | 'error';
+
+export interface Domain {
   id: ID;
   userId: ID;
   name: string;
   description?: string;
-  domain?: string;
-  settings: AssistantSettings;
-  status: 'initializing' | 'ready' | 'processing' | 'error';
+  expertise?: string;
+  settings: DomainSettings;
+  status: DomainStatus;
   documentCount: number;
   conversationCount: number;
+  workspacePath?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 
-export interface CreateAssistantInput {
+export interface CreateDomainInput {
   name: string;
   description?: string;
-  domain?: string;
-  settings?: Partial<AssistantSettings>;
+  expertise?: string;
+  settings?: Partial<DomainSettings>;
 }
 
-export interface UpdateAssistantInput {
+export interface UpdateDomainInput {
   name?: string;
-  description?: string;
-  domain?: string;
-  settings?: Partial<AssistantSettings>;
+  description?: string | null;
+  expertise?: string | null;
+  settings?: Partial<DomainSettings>;
 }
+
+// 向后兼容别名（将在未来版本移除）
+/** @deprecated 使用 DomainSettings 代替 */
+export type AssistantSettings = DomainSettings;
+/** @deprecated 使用 Domain 代替 */
+export type Assistant = Domain;
+/** @deprecated 使用 CreateDomainInput 代替 */
+export type CreateAssistantInput = CreateDomainInput;
+/** @deprecated 使用 UpdateDomainInput 代替 */
+export type UpdateAssistantInput = UpdateDomainInput;
 
 // ============================================
 // 文档相关类型
@@ -75,19 +88,90 @@ export interface UpdateAssistantInput {
 export type DocumentStatus = 'uploading' | 'queued' | 'processing' | 'completed' | 'failed';
 export type FileType = 'pdf' | 'docx' | 'txt' | 'md' | 'xlsx';
 
+export interface DocumentMetadata {
+  title?: string;
+  author?: string;
+  pageCount?: number;
+  [key: string]: unknown;
+}
+
 export interface Document {
   id: ID;
-  assistantId: ID;
+  domainId: ID;
+  /** @deprecated 使用 domainId 代替 */
+  assistantId?: ID;
   filename: string;
   fileType: FileType;
   fileSize: number;
+  filePath: string;
   status: DocumentStatus;
   progress: number;
   errorMessage?: string;
   chunkCount: number;
-  metadata: Record<string, unknown>;
+  retryCount: number;
+  metadata: DocumentMetadata;
   uploadedAt: Timestamp;
   processedAt?: Timestamp;
+}
+
+export interface CreateDocumentInput {
+  filename: string;
+  fileType: FileType;
+  fileSize: number;
+  filePath: string;
+}
+
+export interface UpdateDocumentInput {
+  status?: DocumentStatus;
+  progress?: number;
+  errorMessage?: string | null;
+  chunkCount?: number;
+  retryCount?: number;
+  metadata?: DocumentMetadata;
+  processedAt?: Timestamp;
+}
+
+export interface DocumentListParams extends PaginationParams {
+  status?: DocumentStatus;
+}
+
+// ============================================
+// 文档处理相关类型
+// ============================================
+
+export interface ParseResult {
+  success: boolean;
+  content: string;
+  metadata: DocumentMetadata;
+  error?: string;
+}
+
+export interface DocumentChunk {
+  id: string;
+  documentId: ID;
+  content: string;
+  chunkIndex: number;
+  startPosition: number;
+  endPosition: number;
+}
+
+export interface VectorPoint {
+  id: string;
+  vector: number[];
+  payload: {
+    documentId: string;
+    documentName: string;
+    content: string;
+    chunkIndex: number;
+    startPosition: number;
+    endPosition: number;
+  };
+}
+
+export interface ProcessingProgress {
+  stage: 'validation' | 'extraction' | 'cleaning' | 'chunking' | 'embedding' | 'indexing';
+  progress: number;
+  message?: string;
 }
 
 // ============================================
@@ -125,7 +209,7 @@ export interface Message {
 
 export interface Conversation {
   id: ID;
-  assistantId: ID;
+  domainId: ID;
   title: string;
   status: 'active' | 'archived';
   messageCount: number;
@@ -134,7 +218,7 @@ export interface Conversation {
 }
 
 export interface CreateConversationInput {
-  assistantId: ID;
+  domainId: ID;
   title?: string;
 }
 
@@ -154,7 +238,7 @@ export interface RolePersonality {
 
 export interface Role {
   id: ID;
-  assistantId: ID;
+  domainId: ID;
   name: string;
   description?: string;
   promptTemplate?: string;

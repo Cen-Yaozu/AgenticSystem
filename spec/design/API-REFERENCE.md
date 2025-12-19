@@ -1,8 +1,8 @@
 # API 参考文档
 
-> **版本**: 1.0.0  
-> **状态**: Draft  
-> **最后更新**: 2024-12-16
+> **版本**: 3.0.0
+> **状态**: Draft
+> **最后更新**: 2024-12-19
 
 ---
 
@@ -21,7 +21,7 @@
 
 | 文档 | 描述 |
 |------|------|
-| [SPEC-002](../SPEC-002-ASSISTANT-MANAGEMENT.md) | 助手管理需求 |
+| [SPEC-002](../SPEC-002-DOMAIN-MANAGEMENT.md) | 领域管理需求 |
 | [SPEC-003](../SPEC-003-DOCUMENT-PROCESSING.md) | 文档处理需求 |
 | [SPEC-004](../SPEC-004-CONVERSATION-SYSTEM.md) | 对话系统需求 |
 
@@ -161,7 +161,7 @@ Content-Type: application/json
 
 | 前缀 | 实体 |
 |------|------|
-| ASSISTANT_ | 助手相关 |
+| DOMAIN_ | 领域相关 |
 | DOCUMENT_ | 文档相关 |
 | CONVERSATION_ | 对话相关 |
 | MESSAGE_ | 消息相关 |
@@ -173,31 +173,31 @@ Content-Type: application/json
 
 | 后缀 | 错误类型 | 示例 |
 |------|----------|------|
-| _NOT_FOUND | 资源不存在 | ASSISTANT_NOT_FOUND |
-| _REQUIRED | 必填字段缺失 | ASSISTANT_NAME_REQUIRED |
-| _TOO_LONG | 字段过长 | ASSISTANT_NAME_TOO_LONG |
-| _DUPLICATE | 资源重复 | ASSISTANT_NAME_DUPLICATE |
-| _LIMIT_EXCEEDED | 超过限制 | ASSISTANT_LIMIT_EXCEEDED |
-| _CANNOT_DELETE | 无法删除 | ASSISTANT_CANNOT_DELETE |
+| _NOT_FOUND | 资源不存在 | DOMAIN_NOT_FOUND |
+| _REQUIRED | 必填字段缺失 | DOMAIN_NAME_REQUIRED |
+| _TOO_LONG | 字段过长 | DOMAIN_NAME_TOO_LONG |
+| _DUPLICATE | 资源重复 | DOMAIN_NAME_DUPLICATE |
+| _LIMIT_EXCEEDED | 超过限制 | DOMAIN_LIMIT_EXCEEDED |
+| _CANNOT_DELETE | 无法删除 | DOMAIN_CANNOT_DELETE |
 | _INVALID | 格式无效 | DOCUMENT_TYPE_INVALID |
 | _PROCESSING | 正在处理中 | DOCUMENT_ALREADY_PROCESSING |
 
 ---
 
-## 3. 助手管理 API
+## 3. 领域管理 API
 
-### 3.1 创建助手
+### 3.1 创建领域
 
 ```http
-POST /assistants
+POST /domains
 ```
 
 **请求体**:
 ```json
 {
-  "name": "法律助手",
-  "description": "专业的法律文档分析助手",
-  "domain": "legal",
+  "name": "法律知识库",
+  "description": "专业的法律文档分析知识库",
+  "expertise": "legal",
   "settings": {
     "responseStyle": "detailed",
     "tone": "formal"
@@ -210,39 +210,91 @@ POST /assistants
 {
   "success": true,
   "data": {
-    "id": "ast_clx1234567890",
-    "name": "法律助手",
+    "id": "dom_clx1234567890",
+    "name": "法律知识库",
     "status": "initializing",
     "createdAt": "2024-12-16T10:00:00.000Z"
   }
 }
 ```
 
-### 3.2 获取助手列表
+### 3.2 获取领域列表
 
 ```http
-GET /assistants?page=1&limit=10&domain=legal
+GET /domains?page=1&limit=10&expertise=legal
 ```
 
-### 3.3 获取助手详情
+### 3.3 获取领域详情
 
 ```http
-GET /assistants/:assistantId
+GET /domains/:domainId
 ```
 
-### 3.4 更新助手
+### 3.4 更新领域
 
 ```http
-PUT /assistants/:assistantId
+PUT /domains/:domainId
 ```
 
-### 3.5 删除助手
+### 3.5 删除领域
 
 ```http
-DELETE /assistants/:assistantId
+DELETE /domains/:domainId
 ```
 
 **响应**: 204 No Content
+
+### 3.6 获取领域 PromptX 资源
+
+获取领域工作区中的 PromptX 资源（角色、工具）。
+
+```http
+GET /domains/:domainId/resources
+```
+
+**查询参数**:
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| focus | string | 否 | 聚焦范围：all(默认)、roles、tools |
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "roles": [
+      {
+        "id": "dom_xxx-domain",
+        "name": "法律知识库",
+        "expertise": "legal",
+        "source": "project"
+      }
+    ],
+    "tools": [
+      {
+        "name": "pdf-reader",
+        "description": "读取 PDF 文件",
+        "source": "system"
+      },
+      {
+        "name": "word-tool",
+        "description": "读取 Word 文件",
+        "source": "system"
+      },
+      {
+        "name": "excel-tool",
+        "description": "读取 Excel 文件",
+        "source": "system"
+      }
+    ]
+  }
+}
+```
+
+**说明**:
+- `source: "system"` - PromptX 系统内置资源
+- `source: "project"` - 工作区中定义的资源
+- 内部实现：调用 PromptX 的 `promptx_discover` MCP 方法
 
 ---
 
@@ -251,7 +303,7 @@ DELETE /assistants/:assistantId
 ### 4.1 上传文档
 
 ```http
-POST /assistants/:assistantId/documents
+POST /domains/:domainId/documents
 Content-Type: multipart/form-data
 ```
 
@@ -273,7 +325,7 @@ Content-Type: multipart/form-data
 ### 4.2 获取文档列表
 
 ```http
-GET /assistants/:assistantId/documents?status=completed&page=1&limit=10
+GET /domains/:domainId/documents?status=completed&page=1&limit=10
 ```
 
 ### 4.3 获取文档处理状态
@@ -314,7 +366,7 @@ POST /documents/:documentId/reprocess
 ### 5.1 创建对话
 
 ```http
-POST /assistants/:assistantId/conversations
+POST /domains/:domainId/conversations
 ```
 
 **请求体**:
@@ -327,7 +379,7 @@ POST /assistants/:assistantId/conversations
 ### 5.2 获取对话列表
 
 ```http
-GET /assistants/:assistantId/conversations?page=1&limit=10
+GET /domains/:domainId/conversations?page=1&limit=10
 ```
 
 ### 5.3 发送消息
@@ -400,95 +452,80 @@ DELETE /conversations/:conversationId
 
 ---
 
-## 6. 角色管理 API
+## 6. PromptX MCP 集成
 
-### 6.1 获取角色列表
+> **重要说明**：角色和记忆功能由 PromptX 提供，通过 MCP 协议访问，不是本项目的 REST API。
 
-```http
-GET /assistants/:assistantId/roles
+### 6.1 概述
+
+本项目不提供角色管理和记忆管理的 REST API。这些功能由 PromptX 通过 MCP（Model Context Protocol）协议提供。
+
+### 6.2 PromptX MCP 调用
+
+在对话过程中，Agent 框架通过 MCP 协议调用 PromptX：
+
+#### 激活角色
+
+```typescript
+// 激活领域角色
+await mcpClient.call('promptx_action', {
+  role: 'legal-domain'
+});
+
+// 激活子代理角色
+await mcpClient.call('promptx_action', {
+  role: 'retriever'
+});
 ```
 
-### 6.2 创建角色
+#### 保存记忆
 
-```http
-POST /assistants/:assistantId/roles
+```typescript
+await mcpClient.call('promptx_remember', {
+  role: 'legal-assistant',
+  engrams: [{
+    content: '用户偏好详细的风险分析报告',
+    schema: '用户 偏好 详细 风险分析 报告',
+    strength: 0.8,
+    type: 'ATOMIC'
+  }]
+});
 ```
 
-**请求体**:
-```json
-{
-  "name": "合同风险分析师",
-  "description": "专门分析合同中的法律风险",
-  "promptTemplate": "你是一位专业的合同风险分析师...",
-  "capabilities": ["风险识别", "条款分析"]
-}
+#### 检索记忆
+
+```typescript
+// DMN 模式 - 查看记忆全景
+await mcpClient.call('promptx_recall', {
+  role: 'legal-assistant',
+  query: null,
+  mode: 'balanced'
+});
+
+// 关键词模式
+await mcpClient.call('promptx_recall', {
+  role: 'legal-assistant',
+  query: '风险分析 报告',
+  mode: 'focused'
+});
 ```
 
-### 6.3 激活/停用角色
+### 6.3 相关文档
 
-```http
-PATCH /roles/:roleId/status
-```
-
-**请求体**:
-```json
-{
-  "isActive": true
-}
-```
+- [SPEC-005 PromptX 角色与记忆集成](../SPEC-005-ROLE-MEMORY.md)
+- [Agentic 架构设计](./AGENTIC-ARCHITECTURE.md)
 
 ---
 
-## 7. 记忆管理 API
+## 7. WebSocket 事件
 
-### 7.1 获取角色记忆
-
-```http
-GET /roles/:roleId/memories?type=preference&limit=20
-```
-
-### 7.2 创建记忆
-
-```http
-POST /roles/:roleId/memories
-```
-
-**请求体**:
-```json
-{
-  "type": "preference",
-  "content": "用户偏好详细的风险分析报告",
-  "schema": "用户 偏好 详细 风险分析 报告",
-  "strength": 0.8
-}
-```
-
-### 7.3 检索记忆
-
-```http
-POST /roles/:roleId/memories/recall
-```
-
-**请求体**:
-```json
-{
-  "query": "风险分析 报告",
-  "mode": "balanced",
-  "limit": 10
-}
-```
-
----
-
-## 8. WebSocket 事件
-
-### 8.1 连接
+### 7.1 连接
 
 ```
 ws://localhost:3000/ws?token=<auth_token>
 ```
 
-### 8.2 事件类型
+### 7.2 事件类型
 
 #### 文档处理事件
 
@@ -549,3 +586,5 @@ ws://localhost:3000/ws?token=<auth_token>
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
 | 1.0.0 | 2024-12-16 | 从 SPEC-007 提取，独立为设计文档 |
+| 2.0.0 | 2024-12-17 | 移除角色/记忆 REST API，改为 PromptX MCP 集成说明 |
+| 3.0.0 | 2024-12-19 | 术语重构：助手(Assistant) → 领域(Domain) |

@@ -1,14 +1,16 @@
 # 架构设计文档
 
-> **版本**: 1.0.0  
-> **状态**: Draft  
-> **最后更新**: 2024-12-17
+> **版本**: 3.0.0
+> **状态**: Draft
+> **最后更新**: 2024-12-19
 
 ---
 
 ## 1. 概述
 
 本文档定义 AgentX Agentic RAG 系统的整体架构设计，包括技术选型、项目结构、数据库设计和 API 设计。
+
+> **重要**: 本系统采用 **Agentic 多角色架构**，详细设计请参阅 [AGENTIC-ARCHITECTURE.md](./AGENTIC-ARCHITECTURE.md)。
 
 ### 1.1 设计目标
 
@@ -18,6 +20,7 @@
 | **可扩展** | 架构支持后续扩展（多租户、分布式） |
 | **可维护** | 清晰的分层，易于理解和修改 |
 | **高性能** | 流式响应，异步处理 |
+| **智能** | Agentic 多角色协作，越用越智能 |
 
 ### 1.2 参考项目
 
@@ -26,6 +29,16 @@
 - SQLite 作为 MVP 数据库
 - 前后端一体的项目结构
 - JWT 认证方案
+
+### 1.3 架构文档体系
+
+| 文档 | 描述 |
+|------|------|
+| **本文档** | 整体架构设计（技术选型、项目结构、数据库、API） |
+| [AGENTIC-ARCHITECTURE.md](./AGENTIC-ARCHITECTURE.md) | **Agentic 多角色架构**（核心设计） |
+| [TECHNICAL-ARCHITECTURE.md](./TECHNICAL-ARCHITECTURE.md) | 技术架构（分层、部署、性能） |
+| [DATA-MODEL.md](./DATA-MODEL.md) | 数据模型设计 |
+| [API-REFERENCE.md](./API-REFERENCE.md) | API 参考文档 |
 
 ---
 
@@ -58,7 +71,7 @@
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                       服务层 (Services)                              │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │   │
-│  │  │  Assistant  │  │  Document   │  │Conversation │  │    RAG     │  │   │
+│  │  │   Domain    │  │  Document   │  │Conversation │  │    RAG     │  │   │
 │  │  │  Service    │  │  Service    │  │  Service    │  │  Service   │  │   │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘  │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
@@ -79,9 +92,9 @@
 │  │  │        SQLite           │  │           Qdrant                │   │   │
 │  │  │   (关系数据 + 文件)     │  │        (向量数据)               │   │   │
 │  │  │  - users                │  │  - document_vectors             │   │   │
-│  │  │  - assistants           │  │    - chunkId                    │   │   │
+│  │  │  - domains              │  │    - chunkId                    │   │   │
 │  │  │  - documents            │  │    - documentId                 │   │   │
-│  │  │  - conversations        │  │    - assistantId                │   │   │
+│  │  │  - conversations        │  │    - domainId                   │   │   │
 │  │  │  - messages             │  │    - content                    │   │   │
 │  │  └─────────────────────────┘  └─────────────────────────────────┘   │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
@@ -171,10 +184,10 @@ agentic-rag/
 │       │   │   │   ├── container/    # 容器组件 (Chat, DocumentList)
 │       │   │   │   ├── pane/         # 面板组件 (InputPane, MessagePane)
 │       │   │   │   ├── layout/       # 布局组件 (Sidebar, Header)
-│       │   │   │   └── page/         # 页面组件 (AssistantPage, ChatPage)
+│       │   │   │   └── page/         # 页面组件 (DomainPage, ChatPage)
 │       │   │   ├── hooks/            # 自定义 Hooks
 │       │   │   │   ├── useAuth.ts
-│       │   │   │   ├── useAssistant.ts
+│       │   │   │   ├── useDomain.ts
 │       │   │   │   └── useChat.ts
 │       │   │   ├── stores/           # Zustand 状态
 │       │   │   │   ├── authStore.ts
@@ -187,12 +200,12 @@ agentic-rag/
 │       │   └── server/               # 后端代码
 │       │       ├── api/              # API 路由
 │       │       │   ├── auth.ts       # 认证路由
-│       │       │   ├── assistants.ts # 助手路由
+│       │       │   ├── domains.ts    # 领域路由
 │       │       │   ├── documents.ts  # 文档路由
 │       │       │   └── conversations.ts # 对话路由
 │       │       ├── services/         # 业务服务
 │       │       │   ├── AuthService.ts
-│       │       │   ├── AssistantService.ts
+│       │       │   ├── DomainService.ts
 │       │       │   ├── DocumentService.ts
 │       │       │   ├── ConversationService.ts
 │       │       │   └── RAGService.ts
@@ -201,7 +214,7 @@ agentic-rag/
 │       │       │   ├── index.ts      # 数据库初始化
 │       │       │   └── repositories/ # 数据访问层
 │       │       │       ├── UserRepository.ts
-│       │       │       ├── AssistantRepository.ts
+│       │       │       ├── DomainRepository.ts
 │       │       │       ├── DocumentRepository.ts
 │       │       │       └── ConversationRepository.ts
 │       │       ├── processing/       # 文档处理
@@ -282,34 +295,34 @@ CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_email ON users(email);
 
 -- ============================================
--- 助手表
+-- 领域表
 -- ============================================
-CREATE TABLE assistants (
-  id TEXT PRIMARY KEY,                    -- 格式: ast_xxxxxxxx
+CREATE TABLE domains (
+  id TEXT PRIMARY KEY,                    -- 格式: dom_xxxxxxxx
   user_id TEXT NOT NULL,                  -- 所属用户
-  name TEXT NOT NULL,                     -- 助手名称
+  name TEXT NOT NULL,                     -- 领域名称
   description TEXT,                       -- 描述
-  domain TEXT,                            -- 领域标签
+  expertise TEXT,                         -- 专业领域标签
   settings TEXT DEFAULT '{}',             -- 设置 (JSON)
   status TEXT DEFAULT 'ready',            -- 状态: initializing|ready|processing|error
   document_count INTEGER DEFAULT 0,       -- 文档数量
   conversation_count INTEGER DEFAULT 0,   -- 对话数量
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  
+
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   UNIQUE(user_id, name)
 );
 
-CREATE INDEX idx_assistants_user_id ON assistants(user_id);
-CREATE INDEX idx_assistants_status ON assistants(status);
+CREATE INDEX idx_domains_user_id ON domains(user_id);
+CREATE INDEX idx_domains_status ON domains(status);
 
 -- ============================================
 -- 文档表
 -- ============================================
 CREATE TABLE documents (
   id TEXT PRIMARY KEY,                    -- 格式: doc_xxxxxxxx
-  assistant_id TEXT NOT NULL,             -- 所属助手
+  domain_id TEXT NOT NULL,                -- 所属领域
   filename TEXT NOT NULL,                 -- 文件名
   file_type TEXT NOT NULL,                -- 文件类型: pdf|docx|txt|md|xlsx
   file_path TEXT NOT NULL,                -- 文件路径
@@ -321,11 +334,11 @@ CREATE TABLE documents (
   metadata TEXT DEFAULT '{}',             -- 元数据 (JSON)
   uploaded_at INTEGER NOT NULL,
   processed_at INTEGER,
-  
-  FOREIGN KEY (assistant_id) REFERENCES assistants(id) ON DELETE CASCADE
+
+  FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_documents_assistant_id ON documents(assistant_id);
+CREATE INDEX idx_documents_domain_id ON documents(domain_id);
 CREATE INDEX idx_documents_status ON documents(status);
 
 -- ============================================
@@ -333,17 +346,17 @@ CREATE INDEX idx_documents_status ON documents(status);
 -- ============================================
 CREATE TABLE conversations (
   id TEXT PRIMARY KEY,                    -- 格式: conv_xxxxxxxx
-  assistant_id TEXT NOT NULL,             -- 所属助手
+  domain_id TEXT NOT NULL,                -- 所属领域
   title TEXT,                             -- 对话标题
   status TEXT DEFAULT 'active',           -- 状态: active|archived
   message_count INTEGER DEFAULT 0,        -- 消息数量
   started_at INTEGER NOT NULL,
   last_message_at INTEGER NOT NULL,
-  
-  FOREIGN KEY (assistant_id) REFERENCES assistants(id) ON DELETE CASCADE
+
+  FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_conversations_assistant_id ON conversations(assistant_id);
+CREATE INDEX idx_conversations_domain_id ON conversations(domain_id);
 CREATE INDEX idx_conversations_status ON conversations(status);
 CREATE INDEX idx_conversations_last_message_at ON conversations(last_message_at);
 
@@ -357,7 +370,7 @@ CREATE TABLE messages (
   content TEXT NOT NULL,                  -- 消息内容
   metadata TEXT DEFAULT '{}',             -- 元数据 (JSON): sources, tokens
   created_at INTEGER NOT NULL,
-  
+
   FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 );
 
@@ -369,7 +382,7 @@ CREATE INDEX idx_messages_created_at ON messages(created_at);
 -- ============================================
 CREATE TABLE roles (
   id TEXT PRIMARY KEY,                    -- 格式: role_xxxxxxxx
-  assistant_id TEXT NOT NULL,             -- 所属助手
+  domain_id TEXT NOT NULL,                -- 所属领域
   name TEXT NOT NULL,                     -- 角色名称
   description TEXT,                       -- 描述
   prompt_template TEXT NOT NULL,          -- 提示词模板
@@ -380,12 +393,12 @@ CREATE TABLE roles (
   usage_count INTEGER DEFAULT 0,          -- 使用次数
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  
-  FOREIGN KEY (assistant_id) REFERENCES assistants(id) ON DELETE CASCADE,
-  UNIQUE(assistant_id, name)
+
+  FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE,
+  UNIQUE(domain_id, name)
 );
 
-CREATE INDEX idx_roles_assistant_id ON roles(assistant_id);
+CREATE INDEX idx_roles_domain_id ON roles(domain_id);
 
 -- ============================================
 -- 记忆表（P1 功能）
@@ -400,7 +413,7 @@ CREATE TABLE memories (
   access_count INTEGER DEFAULT 0,         -- 访问次数
   created_at INTEGER NOT NULL,
   last_accessed_at INTEGER,
-  
+
   FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
 );
 
@@ -431,7 +444,7 @@ interface DocumentVectorPoint {
   payload: {
     chunkId: string;        // 分块 ID
     documentId: string;     // 文档 ID
-    assistantId: string;    // 助手 ID
+    domainId: string;       // 领域 ID
     userId: string;         // 用户 ID
     content: string;        // 文本内容
     chunkIndex: number;     // 分块索引
@@ -456,17 +469,17 @@ interface DocumentVectorPoint {
 | `/api/auth/login` | POST | 用户登录 | ❌ |
 | `/api/auth/verify` | GET | 验证 Token | ✅ |
 | `/api/auth/logout` | POST | 用户登出 | ✅ |
-| `/api/assistants` | GET | 助手列表 | ✅ |
-| `/api/assistants` | POST | 创建助手 | ✅ |
-| `/api/assistants/:id` | GET | 助手详情 | ✅ |
-| `/api/assistants/:id` | PUT | 更新助手 | ✅ |
-| `/api/assistants/:id` | DELETE | 删除助手 | ✅ |
-| `/api/assistants/:id/documents` | GET | 文档列表 | ✅ |
-| `/api/assistants/:id/documents` | POST | 上传文档 | ✅ |
+| `/api/domains` | GET | 领域列表 | ✅ |
+| `/api/domains` | POST | 创建领域 | ✅ |
+| `/api/domains/:id` | GET | 领域详情 | ✅ |
+| `/api/domains/:id` | PUT | 更新领域 | ✅ |
+| `/api/domains/:id` | DELETE | 删除领域 | ✅ |
+| `/api/domains/:id/documents` | GET | 文档列表 | ✅ |
+| `/api/domains/:id/documents` | POST | 上传文档 | ✅ |
 | `/api/documents/:id` | GET | 文档详情 | ✅ |
 | `/api/documents/:id` | DELETE | 删除文档 | ✅ |
-| `/api/assistants/:id/conversations` | GET | 对话列表 | ✅ |
-| `/api/assistants/:id/conversations` | POST | 创建对话 | ✅ |
+| `/api/domains/:id/conversations` | GET | 对话列表 | ✅ |
+| `/api/domains/:id/conversations` | POST | 创建对话 | ✅ |
 | `/api/conversations/:id` | GET | 对话详情 | ✅ |
 | `/api/conversations/:id` | DELETE | 删除对话 | ✅ |
 | `/api/conversations/:id/messages` | GET | 消息列表 | ✅ |
@@ -516,16 +529,16 @@ interface DocumentVectorPoint {
 }
 ```
 
-### 6.3 助手 API
+### 6.3 领域 API
 
-#### POST /api/assistants
+#### POST /api/domains
 
 ```typescript
 // Request
 {
   name: string;           // 1-100 字符
   description?: string;   // 最多 500 字符
-  domain?: string;        // 领域标签
+  expertise?: string;     // 专业领域标签
   settings?: {
     responseStyle?: 'detailed' | 'concise';
     tone?: 'formal' | 'friendly';
@@ -538,7 +551,7 @@ interface DocumentVectorPoint {
   id: string;
   name: string;
   description?: string;
-  domain?: string;
+  expertise?: string;
   settings: { ... };
   status: 'ready';
   documentCount: 0;
@@ -550,7 +563,7 @@ interface DocumentVectorPoint {
 
 ### 6.4 文档 API
 
-#### POST /api/assistants/:id/documents
+#### POST /api/domains/:id/documents
 
 ```typescript
 // Request (multipart/form-data)
@@ -752,17 +765,17 @@ LOG_LEVEL=info
 | 措施 | 说明 |
 |------|------|
 | 用户隔离 | 所有查询都带 userId 过滤 |
-| 文件隔离 | 上传文件按用户/助手目录存储 |
-| 向量隔离 | Qdrant 查询带 assistantId 过滤 |
+| 文件隔离 | 上传文件按用户/领域目录存储 |
+| 向量隔离 | Qdrant 查询带 domainId 过滤 |
 
 ### 9.3 输入验证
 
 ```typescript
 // 使用 Zod 进行请求验证
-const createAssistantSchema = z.object({
+const createDomainSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
-  domain: z.string().max(50).optional(),
+  expertise: z.string().max(50).optional(),
   settings: z.object({
     responseStyle: z.enum(['detailed', 'concise']).optional(),
     tone: z.enum(['formal', 'friendly']).optional(),
@@ -801,7 +814,8 @@ const createAssistantSchema = z.object({
 
 | 文档 | 关系 |
 |------|------|
-| [TECHNICAL-ARCHITECTURE.md](./TECHNICAL-ARCHITECTURE.md) | 本文档是其简化和更新版本 |
+| [AGENTIC-ARCHITECTURE.md](./AGENTIC-ARCHITECTURE.md) | **核心** - Agentic 多角色架构设计 |
+| [TECHNICAL-ARCHITECTURE.md](./TECHNICAL-ARCHITECTURE.md) | 技术架构（已更新与本文档对齐） |
 | [DATA-MODEL.md](./DATA-MODEL.md) | 本文档的数据库设计与其一致，但使用 SQLite |
 | [API-REFERENCE.md](./API-REFERENCE.md) | 本文档的 API 设计与其一致 |
 | [PROJECT-SETUP.md](./PROJECT-SETUP.md) | 项目初始化指南 |
@@ -815,3 +829,5 @@ const createAssistantSchema = z.object({
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
 | 1.0.0 | 2024-12-17 | 初始版本，基于 Agent 项目架构设计 |
+| 2.0.0 | 2024-12-17 | 添加 Agentic 架构引用，更新文档体系 |
+| 3.0.0 | 2024-12-19 | 术语重构：助手(Assistant) → 领域(Domain) |

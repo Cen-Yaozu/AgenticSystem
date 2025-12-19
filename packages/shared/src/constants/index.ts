@@ -31,12 +31,16 @@ export const MAX_FILE_SIZE_MB = 10;
 // 状态常量
 // ============================================
 
-export const ASSISTANT_STATUS = {
+export const DOMAIN_STATUS = {
   INITIALIZING: 'initializing',
   READY: 'ready',
   PROCESSING: 'processing',
   ERROR: 'error',
 } as const;
+
+// 向后兼容别名（将在未来版本移除）
+/** @deprecated 使用 DOMAIN_STATUS 代替 */
+export const ASSISTANT_STATUS = DOMAIN_STATUS;
 
 export const DOCUMENT_STATUS = {
   UPLOADING: 'uploading',
@@ -71,13 +75,27 @@ export const ERROR_CODES = {
   CONFLICT: 'CONFLICT',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
 
-  // 助手相关
-  ASSISTANT_NOT_FOUND: 'ASSISTANT_NOT_FOUND',
-  ASSISTANT_NAME_REQUIRED: 'ASSISTANT_NAME_REQUIRED',
-  ASSISTANT_NAME_TOO_LONG: 'ASSISTANT_NAME_TOO_LONG',
-  ASSISTANT_LIMIT_EXCEEDED: 'ASSISTANT_LIMIT_EXCEEDED',
-  ASSISTANT_NAME_DUPLICATE: 'ASSISTANT_NAME_DUPLICATE',
-  ASSISTANT_CANNOT_DELETE: 'ASSISTANT_CANNOT_DELETE',
+  // 领域相关
+  DOMAIN_NOT_FOUND: 'DOMAIN_NOT_FOUND',
+  DOMAIN_NAME_REQUIRED: 'DOMAIN_NAME_REQUIRED',
+  DOMAIN_NAME_TOO_LONG: 'DOMAIN_NAME_TOO_LONG',
+  DOMAIN_LIMIT_EXCEEDED: 'DOMAIN_LIMIT_EXCEEDED',
+  DOMAIN_NAME_DUPLICATE: 'DOMAIN_NAME_DUPLICATE',
+  DOMAIN_CANNOT_DELETE: 'DOMAIN_CANNOT_DELETE',
+
+  // 向后兼容别名（将在未来版本移除）
+  /** @deprecated 使用 DOMAIN_NOT_FOUND 代替 */
+  ASSISTANT_NOT_FOUND: 'DOMAIN_NOT_FOUND',
+  /** @deprecated 使用 DOMAIN_NAME_REQUIRED 代替 */
+  ASSISTANT_NAME_REQUIRED: 'DOMAIN_NAME_REQUIRED',
+  /** @deprecated 使用 DOMAIN_NAME_TOO_LONG 代替 */
+  ASSISTANT_NAME_TOO_LONG: 'DOMAIN_NAME_TOO_LONG',
+  /** @deprecated 使用 DOMAIN_LIMIT_EXCEEDED 代替 */
+  ASSISTANT_LIMIT_EXCEEDED: 'DOMAIN_LIMIT_EXCEEDED',
+  /** @deprecated 使用 DOMAIN_NAME_DUPLICATE 代替 */
+  ASSISTANT_NAME_DUPLICATE: 'DOMAIN_NAME_DUPLICATE',
+  /** @deprecated 使用 DOMAIN_CANNOT_DELETE 代替 */
+  ASSISTANT_CANNOT_DELETE: 'DOMAIN_CANNOT_DELETE',
 
   // 文档相关
   DOCUMENT_NOT_FOUND: 'DOCUMENT_NOT_FOUND',
@@ -115,18 +133,30 @@ export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
 
 // ============================================
-// 助手限制
+// 领域限制
 // ============================================
 
-export const MAX_ASSISTANTS_PER_USER = 10;
-export const MAX_ASSISTANT_NAME_LENGTH = 100;
-export const MAX_ASSISTANT_DESCRIPTION_LENGTH = 500;
+export const MAX_DOMAINS_PER_USER = 10;
+export const MAX_DOMAIN_NAME_LENGTH = 100;
+export const MAX_DOMAIN_DESCRIPTION_LENGTH = 500;
+
+// 向后兼容别名（将在未来版本移除）
+/** @deprecated 使用 MAX_DOMAINS_PER_USER 代替 */
+export const MAX_ASSISTANTS_PER_USER = MAX_DOMAINS_PER_USER;
+/** @deprecated 使用 MAX_DOMAIN_NAME_LENGTH 代替 */
+export const MAX_ASSISTANT_NAME_LENGTH = MAX_DOMAIN_NAME_LENGTH;
+/** @deprecated 使用 MAX_DOMAIN_DESCRIPTION_LENGTH 代替 */
+export const MAX_ASSISTANT_DESCRIPTION_LENGTH = MAX_DOMAIN_DESCRIPTION_LENGTH;
 
 // ============================================
 // 文档限制
 // ============================================
 
-export const MAX_DOCUMENTS_PER_ASSISTANT = 100;
+export const MAX_DOCUMENTS_PER_DOMAIN = 100;
+
+// 向后兼容别名（将在未来版本移除）
+/** @deprecated 使用 MAX_DOCUMENTS_PER_DOMAIN 代替 */
+export const MAX_DOCUMENTS_PER_ASSISTANT = MAX_DOCUMENTS_PER_DOMAIN;
 export const MAX_DOCUMENT_RETRY_COUNT = 3;
 
 // ============================================
@@ -141,13 +171,17 @@ export const CONTEXT_WINDOW_SIZE = 10; // 最近 10 条消息
 // 角色限制
 // ============================================
 
-export const MAX_ROLES_PER_ASSISTANT = 10;
+export const MAX_ROLES_PER_DOMAIN = 10;
+
+// 向后兼容别名（将在未来版本移除）
+/** @deprecated 使用 MAX_ROLES_PER_DOMAIN 代替 */
+export const MAX_ROLES_PER_ASSISTANT = MAX_ROLES_PER_DOMAIN;
 
 // ============================================
 // 默认设置
 // ============================================
 
-export const DEFAULT_ASSISTANT_SETTINGS = {
+export const DEFAULT_DOMAIN_SETTINGS = {
   responseStyle: 'detailed' as const,
   tone: 'formal' as const,
   language: 'zh-CN',
@@ -156,6 +190,10 @@ export const DEFAULT_ASSISTANT_SETTINGS = {
   retrievalTopK: 5,
   retrievalThreshold: 0.7,
 };
+
+// 向后兼容别名（将在未来版本移除）
+/** @deprecated 使用 DEFAULT_DOMAIN_SETTINGS 代替 */
+export const DEFAULT_ASSISTANT_SETTINGS = DEFAULT_DOMAIN_SETTINGS;
 
 // ============================================
 // 文档处理配置
@@ -170,10 +208,14 @@ export const CHUNK_OVERLAP = 200;
 
 export const API_PATHS = {
   HEALTH: '/health',
-  ASSISTANTS: '/api/assistants',
+  DOMAINS: '/api/domains',
   DOCUMENTS: '/api/documents',
   CONVERSATIONS: '/api/conversations',
   MESSAGES: '/api/messages',
   ROLES: '/api/roles',
   MEMORIES: '/api/memories',
+
+  // 向后兼容别名（将在未来版本移除）
+  /** @deprecated 使用 DOMAINS 代替 */
+  ASSISTANTS: '/api/domains',
 } as const;

@@ -1,8 +1,8 @@
 # 技术架构设计
 
-> **版本**: 1.0.0  
-> **状态**: Draft  
-> **最后更新**: 2024-12-16
+> **版本**: 3.0.0
+> **状态**: Draft
+> **最后更新**: 2024-12-19
 
 ---
 
@@ -10,14 +10,16 @@
 
 本文档定义系统的技术架构，包括分层设计、组件交互、技术选型和部署方案。
 
+> **重要**: 本文档已更新以反映实际实现。关于 Agentic 多角色架构的详细设计，请参阅 [AGENTIC-ARCHITECTURE.md](./AGENTIC-ARCHITECTURE.md)。
+
 ### 架构目标
 
 | 目标 | 描述 |
 |------|------|
-| 可扩展性 | 支持水平扩展，应对用户增长 |
-| 可维护性 | 模块化设计，易于维护和升级 |
-| 可靠性 | 故障隔离，优雅降级 |
-| 性能 | 低延迟响应，高吞吐量 |
+| 简单 | MVP 阶段保持简单，避免过度设计 |
+| 可扩展性 | 架构支持后续扩展（多租户、分布式） |
+| 可维护性 | 清晰的分层，易于理解和修改 |
+| 高性能 | 流式响应，异步处理 |
 
 ---
 
@@ -25,69 +27,78 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              系统架构图                                      │
+│                        AgentX Agentic RAG System                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                         前端层 (Frontend)                            │   │
+│  │                         前端层 (Client)                              │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │   │
-│  │  │   React     │  │   Vite      │  │  TanStack   │  │  Tailwind  │  │   │
-│  │  │   18.x      │  │   5.x       │  │   Query     │  │    CSS     │  │   │
+│  │  │   React 18  │  │   Vite 6    │  │  Tailwind   │  │  Zustand   │  │   │
+│  │  │             │  │             │  │   CSS 4     │  │            │  │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                          HTTP / SSE │                                        │
+│                                    ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                         后端层 (Server)                              │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │   │
+│  │  │    Hono     │  │    JWT      │  │    Pino     │  │   Zod      │  │   │
+│  │  │  (Web框架)  │  │   (认证)    │  │   (日志)    │  │  (验证)    │  │   │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘  │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                        │
 │                                    ▼                                        │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                         API 网关层 (Gateway)                         │   │
+│  │                       服务层 (Services)                              │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │   │
-│  │  │   Fastify   │  │    CORS     │  │  Rate Limit │  │   Auth     │  │   │
-│  │  │   4.x       │  │   Handler   │  │   Handler   │  │  Handler   │  │   │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘  │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                    │                                        │
-│                                    ▼                                        │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                       应用服务层 (Services)                          │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │   │
-│  │  │  Assistant  │  │  Document   │  │Conversation │  │   Role     │  │   │
+│  │  │   Domain    │  │  Document   │  │Conversation │  │    RAG     │  │   │
 │  │  │  Service    │  │  Service    │  │  Service    │  │  Service   │  │   │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘  │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                        │
 │                                    ▼                                        │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                      AgentX 运行时层 (Runtime)                       │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │   │
-│  │  │   AgentX    │  │  SystemBus  │  │   Mealy     │  │   Agent    │  │   │
-│  │  │   Runtime   │  │   Events    │  │  Machine    │  │  Manager   │  │   │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘  │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                    │                                        │
-│                                    ▼                                        │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                      PromptX 集成层 (Integration)                    │   │
+│  │                      PromptX 集成层 (Agentic)                        │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │   │
 │  │  │    MCP      │  │    Role     │  │   Memory    │  │   Tool     │  │   │
 │  │  │  Protocol   │  │  Manager    │  │   System    │  │  Runtime   │  │   │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘  │   │
+│  │                                                                       │   │
+│  │  详见: AGENTIC-ARCHITECTURE.md                                        │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                        │
 │                                    ▼                                        │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                       数据处理层 (Processing)                        │   │
+│  │                      数据处理层 (Processing)                         │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │   │
-│  │  │  Document   │  │  Embedding  │  │   Vector    │  │  Retrieval │  │   │
-│  │  │  Processor  │  │  Service    │  │   Engine    │  │   Engine   │  │   │
+│  │  │  Extractor  │  │   Chunker   │  │  Embedder   │  │  Retriever │  │   │
+│  │  │ (文本提取)  │  │  (智能分块) │  │  (向量化)   │  │  (检索)    │  │   │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘  │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                        │
 │                                    ▼                                        │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                         存储层 (Storage)                             │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │   │
-│  │  │ PostgreSQL  │  │   Qdrant    │  │    Redis    │  │    File    │  │   │
-│  │  │   (主库)    │  │  (向量库)   │  │   (缓存)    │  │  Storage   │  │   │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘  │   │
+│  │  ┌─────────────────────────┐  ┌─────────────────────────────────┐   │   │
+│  │  │        SQLite           │  │           Qdrant                │   │   │
+│  │  │   (关系数据 + 文件)     │  │        (向量数据)               │   │   │
+│  │  │  - users                │  │  - document_vectors             │   │   │
+│  │  │  - domains              │  │    - chunkId                    │   │   │
+│  │  │  - documents            │  │    - documentId                 │   │   │
+│  │  │  - conversations        │  │    - domainId                   │   │   │
+│  │  │  - messages             │  │    - content                    │   │   │
+│  │  │  - roles                │  │    - summary                    │   │   │
+│  │  │  - memories             │  │                                 │   │   │
+│  │  └─────────────────────────┘  └─────────────────────────────────┘   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                        外部服务 (External)                           │   │
+│  │  ┌─────────────────────────┐  ┌─────────────────────────────────┐   │   │
+│  │  │      Claude API         │  │      OpenAI Embeddings          │   │   │
+│  │  │      (对话生成)         │  │        (文本向量化)             │   │   │
+│  │  └─────────────────────────┘  └─────────────────────────────────┘   │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -99,67 +110,103 @@
 
 ### 3.1 后端技术栈
 
-| 组件 | 技术 | 版本 | 用途 |
-|------|------|------|------|
-| 运行时 | Node.js | 20.x LTS | JavaScript 运行环境 |
-| 语言 | TypeScript | 5.x | 类型安全 |
-| Web 框架 | Fastify | 4.x | HTTP 服务器 |
-| ORM | Prisma | 5.x | 数据库访问 |
-| 验证 | Zod | 3.x | 请求验证 |
-| 日志 | Pino | 8.x | 结构化日志 |
+| 组件 | 技术 | 版本 | 选择理由 |
+|------|------|------|----------|
+| 运行时 | Node.js | 20.x LTS | 稳定、生态丰富 |
+| 语言 | TypeScript | 5.x | 类型安全、开发体验好 |
+| Web 框架 | **Hono** | 4.x | 轻量（14KB）、TypeScript 原生、支持多运行时 |
+| 数据库 | **SQLite** | - | MVP 简单、无需额外服务、better-sqlite3 高性能 |
+| 向量库 | **Qdrant** | 1.x | 专业向量数据库、支持过滤、REST API |
+| 认证 | **jose** | 5.x | JWT 标准库、安全 |
+| 密码 | **bcrypt** | 5.x | 行业标准、安全 |
+| 日志 | **Pino** | 8.x | 高性能、结构化日志 |
+| 验证 | **Zod** | 3.x | TypeScript 原生、运行时验证 |
+| 文档解析 | pdf-parse, mammoth | - | 成熟的解析库 |
+| 嵌入 | OpenAI Embeddings | - | 高质量向量、text-embedding-3-small |
+| LLM | Claude API | - | 强大的对话能力 |
 
 ### 3.2 前端技术栈
 
-| 组件 | 技术 | 版本 | 用途 |
-|------|------|------|------|
-| 框架 | React | 18.x | UI 框架 |
-| 构建 | Vite | 5.x | 构建工具 |
-| 状态 | TanStack Query | 5.x | 服务端状态 |
-| 状态 | Zustand | 4.x | 客户端状态 |
-| 样式 | Tailwind CSS | 3.x | CSS 框架 |
-| 路由 | React Router | 6.x | 路由管理 |
+| 组件 | 技术 | 版本 | 选择理由 |
+|------|------|------|----------|
+| 框架 | **React** | 18.x | 生态成熟、组件化 |
+| 构建 | **Vite** | 6.x | 快速开发体验、HMR |
+| 样式 | **Tailwind CSS** | 4.x | 原子化 CSS、快速开发 |
+| 状态 | **Zustand** | 4.x | 简单、轻量、TypeScript 友好 |
+| 路由 | **React Router** | 7.x | 标准路由方案 |
+| 请求 | **TanStack Query** | 5.x | 服务端状态管理、缓存 |
+| 图标 | **Lucide React** | - | 轻量、美观 |
 
 ### 3.3 数据存储
 
 | 组件 | 技术 | 版本 | 用途 |
 |------|------|------|------|
-| 主数据库 | PostgreSQL | 15.x | 关系数据存储 |
-| 向量数据库 | Qdrant | 1.x | 向量存储和检索 |
-| 缓存 | Redis | 7.x | 缓存和会话 |
-| 文件存储 | 本地/S3 | - | 文档文件存储 |
+| 主数据库 | **SQLite** | - | 关系数据存储（MVP 阶段） |
+| 向量数据库 | **Qdrant** | 1.x | 向量存储和检索 |
+| 文件存储 | 本地文件系统 | - | 文档文件存储 |
+
+> **注意**: MVP 阶段不使用 Redis 缓存，后期可按需添加。
 
 ### 3.4 AI/ML 组件
 
 | 组件 | 技术 | 用途 |
 |------|------|------|
 | LLM | Claude API | 对话生成 |
-| 嵌入 | OpenAI Embeddings | 文本向量化 |
-| 框架 | AgentX | Agent 运行时 |
-| 角色 | PromptX | 角色和记忆管理 |
+| 嵌入 | OpenAI Embeddings | 文本向量化 (text-embedding-3-small) |
+| 角色系统 | **PromptX MCP** | 角色和记忆管理 |
+
+### 3.5 技术选型对比
+
+#### Hono vs Express vs Fastify
+
+| 特性 | Hono | Express | Fastify |
+|------|------|---------|---------|
+| 大小 | 14KB | 200KB+ | 100KB+ |
+| TypeScript | 原生 | 需要 @types | 原生 |
+| 性能 | 极高 | 中等 | 高 |
+| 多运行时 | ✅ | ❌ | ❌ |
+| 学习曲线 | 低 | 低 | 中 |
+
+**选择 Hono 的理由**：轻量、TypeScript 原生、与参考项目一致。
+
+#### SQLite vs PostgreSQL
+
+| 特性 | SQLite | PostgreSQL |
+|------|--------|------------|
+| 部署复杂度 | 零（文件） | 需要服务 |
+| 性能 | 单机高 | 分布式高 |
+| 并发 | 有限 | 高 |
+| 适用场景 | MVP、单机 | 生产、多实例 |
+
+**选择 SQLite 的理由**：MVP 阶段简单，后期可迁移到 PostgreSQL。
 
 ---
 
 ## 4. 数据流
 
-### 4.1 用户提问流程
+> **详细的 Agentic 数据流设计请参阅 [AGENTIC-ARCHITECTURE.md](./AGENTIC-ARCHITECTURE.md)**
+
+### 4.1 用户提问流程 (Agentic)
 
 ```
-用户输入 → API网关 → 服务层 → AgentX Runtime → PromptX MCP → Claude API
-    │                              │                │
-    │                              ▼                ▼
-    │                         向量检索          记忆系统
-    │                              │                │
-    │                              ▼                ▼
-    │                         上下文组装
-    │                              │
-    ◄──────────────────────────────┘
-              SSE 流式响应
+用户输入 → 主角色分析 → 任务委派 → 子角色执行 → 结果整合 → 流式输出
+    │           │            │           │           │
+    │           ▼            ▼           ▼           ▼
+    │      意图分析      检索角色    向量检索    记忆保存
+    │                   领域专家    记忆回忆
+    │                              │           │
+    ◄──────────────────────────────┴───────────┘
+                    SSE 流式响应
 ```
 
-### 4.2 文档处理流程
+### 4.2 文档处理流程 (Agentic)
 
 ```
-上传文件 → 文件验证 → 文本提取 → 智能分块 → 向量嵌入 → 索引存储
+上传文件 → 文档处理角色 → 智能分块 → 信息增强 → 向量嵌入 → 索引存储
+              │              │           │
+              ▼              ▼           ▼
+         文档类型识别    语义边界分块   生成摘要
+         结构理解        保持上下文     提取关键词
 ```
 
 ---
@@ -167,97 +214,129 @@
 ## 5. 目录结构
 
 ```
-agentic-rag-system/
-├── packages/
-│   ├── backend/
-│   │   ├── src/
-│   │   │   ├── api/              # API 路由
-│   │   │   ├── services/         # 业务服务
-│   │   │   ├── agents/           # AgentX 集成
-│   │   │   ├── promptx/          # PromptX 集成
-│   │   │   ├── processing/       # 文档处理
-│   │   │   ├── retrieval/        # 向量检索
-│   │   │   ├── models/           # 数据模型
-│   │   │   └── utils/            # 工具函数
-│   │   ├── prisma/
-│   │   └── package.json
-│   │
-│   ├── frontend/
-│   │   ├── src/
-│   │   │   ├── components/       # UI 组件
-│   │   │   ├── pages/            # 页面
-│   │   │   ├── hooks/            # 自定义 Hooks
-│   │   │   ├── services/         # API 服务
-│   │   │   ├── stores/           # 状态管理
-│   │   │   └── utils/            # 工具函数
-│   │   └── package.json
-│   │
-│   └── shared/                   # 共享代码
-│       └── src/types/            # 类型定义
+agentic-rag/
+├── apps/
+│   └── web/                          # 主应用（前后端一体）
+│       ├── src/
+│       │   ├── client/               # 前端代码
+│       │   │   ├── components/       # UI 组件
+│       │   │   ├── hooks/            # 自定义 Hooks
+│       │   │   ├── stores/           # Zustand 状态
+│       │   │   ├── services/         # API 服务
+│       │   │   ├── App.tsx           # 应用入口
+│       │   │   └── main.tsx          # 渲染入口
+│       │   │
+│       │   └── server/               # 后端代码
+│       │       ├── routes/           # API 路由
+│       │       ├── services/         # 业务服务
+│       │       ├── repositories/     # 数据访问层
+│       │       ├── database/         # 数据库初始化
+│       │       ├── middleware/       # 中间件
+│       │       ├── validators/       # 数据验证
+│       │       ├── errors/           # 错误处理
+│       │       ├── processing/       # 文档处理（待实现）
+│       │       ├── retrieval/        # 向量检索（待实现）
+│       │       ├── agentic/          # Agentic 角色系统（待实现）
+│       │       ├── utils/            # 工具函数
+│       │       └── index.ts          # 服务器入口
+│       │
+│       ├── public/                   # 静态文件
+│       ├── index.html                # HTML 模板
+│       ├── vite.config.ts            # Vite 配置
+│       ├── vitest.config.ts          # 测试配置
+│       ├── tailwind.config.ts        # Tailwind 配置
+│       ├── tsconfig.json             # TypeScript 配置
+│       └── package.json
 │
-├── spec/                         # 规格文档
-├── docker-compose.yml
-└── package.json
+├── packages/
+│   └── shared/                       # 共享包
+│       ├── src/
+│       │   ├── types/                # 共享类型定义
+│       │   └── constants/            # 共享常量
+│       └── package.json
+│
+├── spec/                             # 规格文档
+│   ├── SPEC-*.md                     # 需求规格
+│   ├── design/                       # 设计文档
+│   └── features/                     # Gherkin 特性文件
+│
+├── openspec/                         # OpenSpec 变更管理
+│   ├── changes/                      # 活跃变更
+│   └── specs/                        # 已归档规格
+│
+├── data/                             # 数据目录（gitignore）
+│   ├── agentic-rag.db                # SQLite 数据库
+│   ├── uploads/                      # 上传文件
+│   └── logs/                         # 日志文件
+│
+├── docker-compose.yml                # Docker 编排（Qdrant）
+├── .env.example                      # 环境变量示例
+├── .gitignore
+├── package.json                      # 根 package.json
+├── pnpm-workspace.yaml               # pnpm 工作区配置
+└── README.md
 ```
 
 ---
 
 ## 6. 部署架构
 
-### 6.1 Docker Compose
+### 6.1 Docker Compose (开发环境)
 
 ```yaml
 version: '3.8'
 
 services:
-  backend:
-    build: ./packages/backend
-    ports:
-      - "3000:3000"
-    environment:
-      - DATABASE_URL=postgresql://user:pass@postgres:5432/agentic_rag
-      - REDIS_URL=redis://redis:6379
-      - QDRANT_URL=http://qdrant:6333
-    depends_on:
-      - postgres
-      - redis
-      - qdrant
-
-  frontend:
-    build: ./packages/frontend
-    ports:
-      - "5173:80"
-    depends_on:
-      - backend
-
-  postgres:
-    image: postgres:15-alpine
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - redis_data:/data
-
+  # Qdrant 向量数据库
   qdrant:
     image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"    # REST API
+      - "6334:6334"    # gRPC
     volumes:
       - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
 
 volumes:
-  postgres_data:
-  redis_data:
   qdrant_data:
 ```
+
+> **注意**: 开发环境中，Web 应用直接通过 `pnpm dev` 运行，不需要 Docker 化。
 
 ### 6.2 环境配置
 
 | 环境 | 用途 | 配置 |
 |------|------|------|
-| development | 本地开发 | 单实例，调试模式 |
+| development | 本地开发 | SQLite + Qdrant Docker |
 | staging | 测试环境 | 模拟生产配置 |
-| production | 生产环境 | 高可用，监控告警 |
+| production | 生产环境 | PostgreSQL + Qdrant Cloud |
+
+### 6.3 环境变量
+
+```bash
+# 服务器配置
+PORT=3000
+NODE_ENV=development
+
+# 数据库
+DATABASE_PATH=./data/agentic-rag.db
+
+# 向量数据库
+QDRANT_URL=http://localhost:6333
+
+# AI 服务
+ANTHROPIC_API_KEY=your-anthropic-api-key
+OPENAI_API_KEY=your-openai-api-key
+
+# 认证
+JWT_SECRET=your-jwt-secret
+API_KEY=your-api-key
+
+# 嵌入模型
+EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_DIMENSIONS=1536
+```
 
 ---
 
@@ -277,8 +356,8 @@ volumes:
 ### 8.1 认证授权
 
 - JWT Token 认证
-- 基于角色的访问控制 (RBAC)
-- API 密钥管理
+- API Key 认证（MVP 阶段简化）
+- 基于角色的访问控制 (RBAC)（后期）
 
 ### 8.2 数据安全
 
@@ -289,8 +368,19 @@ volumes:
 ### 8.3 安全防护
 
 - 请求频率限制
-- SQL 注入防护
+- SQL 注入防护（参数化查询）
 - XSS 防护
+
+---
+
+## 9. 相关文档
+
+| 文档 | 描述 |
+|------|------|
+| [AGENTIC-ARCHITECTURE.md](./AGENTIC-ARCHITECTURE.md) | Agentic 多角色架构详细设计 |
+| [ARCHITECTURE-DESIGN.md](./ARCHITECTURE-DESIGN.md) | 整体架构设计 |
+| [DATA-MODEL.md](./DATA-MODEL.md) | 数据模型设计 |
+| [API-REFERENCE.md](./API-REFERENCE.md) | API 参考文档 |
 
 ---
 
@@ -298,4 +388,6 @@ volumes:
 
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
-| 1.0.0 | 2024-12-16 | 从 SPEC-008 提取，独立为设计文档 |
+| 1.0.0 | 2024-12-16 | 初始版本 |
+| 2.0.0 | 2024-12-17 | 更新技术栈（Hono/SQLite），添加 Agentic 架构引用 |
+| 3.0.0 | 2024-12-19 | 术语重构：助手(Assistant) → 领域(Domain) |
