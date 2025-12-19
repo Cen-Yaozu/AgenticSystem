@@ -38,9 +38,14 @@ export const EXTENSION_MAP: Record<string, (typeof SUPPORTED_FILE_TYPES)[number]
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 /**
- * 每个助手最大文档数量
+ * 每个领域最大文档数量
  */
-export const MAX_DOCUMENTS_PER_ASSISTANT = 100;
+export const MAX_DOCUMENTS_PER_DOMAIN = 100;
+
+/**
+ * @deprecated Use MAX_DOCUMENTS_PER_DOMAIN instead
+ */
+export const MAX_DOCUMENTS_PER_ASSISTANT = MAX_DOCUMENTS_PER_DOMAIN;
 
 /**
  * 文档状态验证 Schema
@@ -79,23 +84,33 @@ export const documentIdSchema = z.object({
 });
 
 /**
- * 助手 ID 参数验证 Schema（用于文档路由）
+ * 领域 ID 参数验证 Schema（用于文档路由）
+ */
+export const domainIdParamSchema = z.object({
+  domainId: z
+    .string()
+    .min(1, 'Domain ID is required')
+    .regex(/^(dom|ast)_[a-zA-Z0-9]+$/, 'Invalid domain ID format'),
+});
+
+/**
+ * @deprecated Use domainIdParamSchema instead
  */
 export const assistantIdParamSchema = z.object({
   id: z
     .string()
     .min(1, 'Assistant ID is required')
-    .regex(/^ast_[a-zA-Z0-9]+$/, 'Invalid assistant ID format'),
+    .regex(/^(dom|ast)_[a-zA-Z0-9]+$/, 'Invalid assistant ID format'),
 });
 
 /**
- * 文档路由参数验证 Schema（包含助手 ID 和文档 ID）
+ * 文档路由参数验证 Schema（包含领域 ID 和文档 ID）
  */
 export const documentParamsSchema = z.object({
-  id: z
+  domainId: z
     .string()
-    .min(1, 'Assistant ID is required')
-    .regex(/^ast_[a-zA-Z0-9]+$/, 'Invalid assistant ID format'),
+    .min(1, 'Domain ID is required')
+    .regex(/^(dom|ast)_[a-zA-Z0-9]+$/, 'Invalid domain ID format'),
   docId: z
     .string()
     .min(1, 'Document ID is required')
@@ -146,5 +161,7 @@ export function validateFileSize(size: number): {
 // 导出类型
 export type ListDocumentsQuery = z.infer<typeof listDocumentsSchema>;
 export type DocumentIdParams = z.infer<typeof documentIdSchema>;
+export type DomainIdParams = z.infer<typeof domainIdParamSchema>;
+/** @deprecated Use DomainIdParams instead */
 export type AssistantIdParams = z.infer<typeof assistantIdParamSchema>;
 export type DocumentParams = z.infer<typeof documentParamsSchema>;

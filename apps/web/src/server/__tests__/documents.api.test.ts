@@ -9,7 +9,7 @@ import { errorHandler } from '../middleware/error.js';
 
 // 测试常量
 const TEST_USER_ID = 'test-user-001';
-const TEST_ASSISTANT_ID = 'ast_test-assistant-001';
+const TEST_DOMAIN_ID = 'dom_test-domain-001';
 const TEST_API_KEY = 'test-api-key';
 
 // 测试数据库实例
@@ -33,13 +33,13 @@ function createTestSchema(db: Database.Database): void {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- 助手表
-    CREATE TABLE IF NOT EXISTS assistants (
+    -- 领域表（原助手表）
+    CREATE TABLE IF NOT EXISTS domains (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       description TEXT,
-      domain TEXT,
+      expertise TEXT,
       settings TEXT DEFAULT '{}',
       status TEXT DEFAULT 'initializing' CHECK (status IN ('initializing', 'ready', 'processing', 'error')),
       document_count INTEGER DEFAULT 0,
@@ -49,13 +49,13 @@ function createTestSchema(db: Database.Database): void {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE INDEX IF NOT EXISTS idx_assistants_user_id ON assistants(user_id);
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_assistants_user_name ON assistants(user_id, name);
+    CREATE INDEX IF NOT EXISTS idx_domains_user_id ON domains(user_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_domains_user_name ON domains(user_id, name);
 
     -- 文档表
     CREATE TABLE IF NOT EXISTS documents (
       id TEXT PRIMARY KEY,
-      assistant_id TEXT NOT NULL REFERENCES assistants(id) ON DELETE CASCADE,
+      domain_id TEXT NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
       filename TEXT NOT NULL,
       file_type TEXT NOT NULL,
       file_size INTEGER NOT NULL,
@@ -70,7 +70,7 @@ function createTestSchema(db: Database.Database): void {
       processed_at TEXT
     );
 
-    CREATE INDEX IF NOT EXISTS idx_documents_assistant_id ON documents(assistant_id);
+    CREATE INDEX IF NOT EXISTS idx_documents_domain_id ON documents(domain_id);
     CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
 
     -- 插入测试用户
@@ -84,13 +84,13 @@ function createTestSchema(db: Database.Database): void {
       CURRENT_TIMESTAMP
     );
 
-    -- 插入测试助手
-    INSERT INTO assistants (id, user_id, name, description, status, created_at, updated_at)
+    -- 插入测试领域
+    INSERT INTO domains (id, user_id, name, description, status, created_at, updated_at)
     VALUES (
-      '${TEST_ASSISTANT_ID}',
+      '${TEST_DOMAIN_ID}',
       '${TEST_USER_ID}',
-      'Test Assistant',
-      'A test assistant',
+      'Test Domain',
+      'A test domain',
       'ready',
       CURRENT_TIMESTAMP,
       CURRENT_TIMESTAMP
@@ -162,13 +162,13 @@ describe('Documents API', () => {
     const documentsRoutes = (await import('../routes/documents.js')).default;
 
     // 挂载路由
-    app.route('/api/v1/assistants/:assistantId/documents', documentsRoutes);
+    app.route('/api/v1/domains/:domainId/documents', documentsRoutes);
   });
 
-  describe('GET /api/v1/assistants/:assistantId/documents', () => {
+  describe('GET /api/v1/domains/:domainId/documents', () => {
     it('should return empty list when no documents', async () => {
       const res = await app.request(
-        `/api/v1/assistants/${TEST_ASSISTANT_ID}/documents`,
+        `/api/v1/domains/${TEST_DOMAIN_ID}/documents`,
         {
           method: 'GET',
           headers: {
@@ -187,14 +187,14 @@ describe('Documents API', () => {
     it('should return documents list with pagination', async () => {
       // 插入测试文档
       testDb.exec(`
-        INSERT INTO documents (id, assistant_id, filename, file_type, file_size, status)
+        INSERT INTO documents (id, domain_id, filename, file_type, file_size, status)
         VALUES
-          ('doc_001', '${TEST_ASSISTANT_ID}', 'test1.pdf', 'pdf', 1024, 'completed'),
-          ('doc_002', '${TEST_ASSISTANT_ID}', 'test2.docx', 'docx', 2048, 'queued')
+          ('doc_001', '${TEST_DOMAIN_ID}', 'test1.pdf', 'pdf', 1024, 'completed'),
+          ('doc_002', '${TEST_DOMAIN_ID}', 'test2.docx', 'docx', 2048, 'queued')
       `);
 
       const res = await app.request(
-        `/api/v1/assistants/${TEST_ASSISTANT_ID}/documents?page=1&pageSize=10`,
+        `/api/v1/domains/${TEST_DOMAIN_ID}/documents?page=1&pageSize=10`,
         {
           method: 'GET',
           headers: {
@@ -213,14 +213,14 @@ describe('Documents API', () => {
     it('should filter documents by status', async () => {
       // 插入测试文档
       testDb.exec(`
-        INSERT INTO documents (id, assistant_id, filename, file_type, file_size, status)
+        INSERT INTO documents (id, domain_id, filename, file_type, file_size, status)
         VALUES
-          ('doc_003', '${TEST_ASSISTANT_ID}', 'completed.pdf', 'pdf', 1024, 'completed'),
-          ('doc_004', '${TEST_ASSISTANT_ID}', 'queued.pdf', 'pdf', 2048, 'queued')
+          ('doc_003', '${TEST_DOMAIN_ID}', 'completed.pdf', 'pdf', 1024, 'completed'),
+          ('doc_004', '${TEST_DOMAIN_ID}', 'queued.pdf', 'pdf', 2048, 'queued')
       `);
 
       const res = await app.request(
-        `/api/v1/assistants/${TEST_ASSISTANT_ID}/documents?status=completed`,
+        `/api/v1/domains/${TEST_DOMAIN_ID}/documents?status=completed`,
         {
           method: 'GET',
           headers: {
@@ -237,16 +237,16 @@ describe('Documents API', () => {
     });
   });
 
-  describe('GET /api/v1/assistants/:assistantId/documents/:documentId', () => {
+  describe('GET /api/v1/domains/:domainId/documents/:documentId', () => {
     it('should return document details', async () => {
       // 插入测试文档
       testDb.exec(`
-        INSERT INTO documents (id, assistant_id, filename, file_type, file_size, status, chunk_count)
-        VALUES ('doc_005', '${TEST_ASSISTANT_ID}', 'detail.pdf', 'pdf', 1024, 'completed', 10)
+        INSERT INTO documents (id, domain_id, filename, file_type, file_size, status, chunk_count)
+        VALUES ('doc_005', '${TEST_DOMAIN_ID}', 'detail.pdf', 'pdf', 1024, 'completed', 10)
       `);
 
       const res = await app.request(
-        `/api/v1/assistants/${TEST_ASSISTANT_ID}/documents/doc_005`,
+        `/api/v1/domains/${TEST_DOMAIN_ID}/documents/doc_005`,
         {
           method: 'GET',
           headers: {
@@ -265,7 +265,7 @@ describe('Documents API', () => {
 
     it('should return 404 for non-existent document', async () => {
       const res = await app.request(
-        `/api/v1/assistants/${TEST_ASSISTANT_ID}/documents/non-existent`,
+        `/api/v1/domains/${TEST_DOMAIN_ID}/documents/non-existent`,
         {
           method: 'GET',
           headers: {
@@ -278,16 +278,16 @@ describe('Documents API', () => {
     });
   });
 
-  describe('DELETE /api/v1/assistants/:assistantId/documents/:documentId', () => {
+  describe('DELETE /api/v1/domains/:domainId/documents/:documentId', () => {
     it('should delete document', async () => {
       // 插入测试文档
       testDb.exec(`
-        INSERT INTO documents (id, assistant_id, filename, file_type, file_size, status)
-        VALUES ('doc_006', '${TEST_ASSISTANT_ID}', 'delete.pdf', 'pdf', 1024, 'completed')
+        INSERT INTO documents (id, domain_id, filename, file_type, file_size, status)
+        VALUES ('doc_006', '${TEST_DOMAIN_ID}', 'delete.pdf', 'pdf', 1024, 'completed')
       `);
 
       const res = await app.request(
-        `/api/v1/assistants/${TEST_ASSISTANT_ID}/documents/doc_006`,
+        `/api/v1/domains/${TEST_DOMAIN_ID}/documents/doc_006`,
         {
           method: 'DELETE',
           headers: {
@@ -305,7 +305,7 @@ describe('Documents API', () => {
 
     it('should return 404 when deleting non-existent document', async () => {
       const res = await app.request(
-        `/api/v1/assistants/${TEST_ASSISTANT_ID}/documents/non-existent`,
+        `/api/v1/domains/${TEST_DOMAIN_ID}/documents/non-existent`,
         {
           method: 'DELETE',
           headers: {
@@ -318,19 +318,19 @@ describe('Documents API', () => {
     });
   });
 
-  describe('GET /api/v1/assistants/:assistantId/documents/stats', () => {
+  describe('GET /api/v1/domains/:domainId/documents/stats', () => {
     it('should return document statistics', async () => {
       // 插入测试文档
       testDb.exec(`
-        INSERT INTO documents (id, assistant_id, filename, file_type, file_size, status, chunk_count)
+        INSERT INTO documents (id, domain_id, filename, file_type, file_size, status, chunk_count)
         VALUES
-          ('doc_007', '${TEST_ASSISTANT_ID}', 'stat1.pdf', 'pdf', 1000, 'completed', 5),
-          ('doc_008', '${TEST_ASSISTANT_ID}', 'stat2.pdf', 'pdf', 2000, 'completed', 10),
-          ('doc_009', '${TEST_ASSISTANT_ID}', 'stat3.pdf', 'pdf', 3000, 'queued', 0)
+          ('doc_007', '${TEST_DOMAIN_ID}', 'stat1.pdf', 'pdf', 1000, 'completed', 5),
+          ('doc_008', '${TEST_DOMAIN_ID}', 'stat2.pdf', 'pdf', 2000, 'completed', 10),
+          ('doc_009', '${TEST_DOMAIN_ID}', 'stat3.pdf', 'pdf', 3000, 'queued', 0)
       `);
 
       const res = await app.request(
-        `/api/v1/assistants/${TEST_ASSISTANT_ID}/documents/stats`,
+        `/api/v1/domains/${TEST_DOMAIN_ID}/documents/stats`,
         {
           method: 'GET',
           headers: {
@@ -350,18 +350,18 @@ describe('Documents API', () => {
     });
   });
 
-  describe('POST /api/v1/assistants/:assistantId/documents/:documentId/reprocess', () => {
+  describe('POST /api/v1/domains/:domainId/documents/:documentId/reprocess', () => {
     it('should reprocess failed document', async () => {
       // 插入失败的测试文档
       testDb.exec(`
-        INSERT INTO documents (id, assistant_id, filename, file_type, file_size, file_path, status, error_message)
-        VALUES ('doc_010', '${TEST_ASSISTANT_ID}', 'reprocess.pdf', 'pdf', 1024, '/tmp/reprocess.pdf', 'failed', 'Previous error')
+        INSERT INTO documents (id, domain_id, filename, file_type, file_size, file_path, status, error_message)
+        VALUES ('doc_010', '${TEST_DOMAIN_ID}', 'reprocess.pdf', 'pdf', 1024, '/tmp/reprocess.pdf', 'failed', 'Previous error')
       `);
 
       // 创建临时文件
       const fs = await import('fs');
       const path = await import('path');
-      const tmpDir = path.join(process.cwd(), 'data', 'documents', TEST_ASSISTANT_ID);
+      const tmpDir = path.join(process.cwd(), 'data', 'documents', TEST_DOMAIN_ID);
       fs.mkdirSync(tmpDir, { recursive: true });
       fs.writeFileSync(path.join(tmpDir, 'doc_010.pdf'), 'test content');
 
@@ -371,7 +371,7 @@ describe('Documents API', () => {
       `);
 
       const res = await app.request(
-        `/api/v1/assistants/${TEST_ASSISTANT_ID}/documents/doc_010/reprocess`,
+        `/api/v1/domains/${TEST_DOMAIN_ID}/documents/doc_010/reprocess`,
         {
           method: 'POST',
           headers: {

@@ -1,6 +1,6 @@
 # SPEC-004: 对话系统
 
-> 版本: 4.0 | 状态: Draft | 日期: 2024-12-17
+> 版本: 5.0 | 状态: Draft | 日期: 2024-12-19
 
 ## 1. 概述
 
@@ -18,13 +18,13 @@
 
 **相关文档**：
 - [SPEC-001 系统概述](./SPEC-001-SYSTEM-OVERVIEW.md)
-- [SPEC-002 助手管理](./SPEC-002-ASSISTANT-MANAGEMENT.md)
+- [SPEC-002 领域管理](./SPEC-002-DOMAIN-MANAGEMENT.md)
 - [SPEC-003 文档处理](./SPEC-003-DOCUMENT-PROCESSING.md)
 - [SPEC-005 PromptX 集成](./SPEC-005-ROLE-MEMORY.md)
 
 ## 2. 用户故事
 
-作为用户，我希望与助手进行智能对话，以便快速获取基于文档的专业回答。
+作为用户，我希望与领域进行智能对话，以便快速获取基于文档的专业回答。
 
 **核心场景**：
 1. 创建新对话
@@ -71,14 +71,14 @@
 │      │                                                                      │
 │      ▼                                                                      │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  1. 激活助手角色（PromptX）                                          │   │
-│  │     promptx_action({ role: '{assistantId}-assistant' })             │   │
+│  │  1. 激活领域角色（PromptX）                                          │   │
+│  │     promptx_action({ role: '{domainId}-domain' })                    │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │      │                                                                      │
 │      ▼                                                                      │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │  2. 检索记忆（PromptX）                                              │   │
-│  │     promptx_recall({ role: '{assistantId}-assistant', query: null }) │   │
+│  │     promptx_recall({ role: '{domainId}-domain', query: null })       │   │
 │  │     → 获取用户偏好、历史交互模式                                     │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │      │                                                                      │
@@ -86,7 +86,7 @@
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │  3. 向量检索（Qdrant）                                               │   │
 │  │     • 将用户问题向量化                                               │   │
-│  │     • 在助手的 collection 中检索相关文档                             │   │
+│  │     • 在领域的 collection 中检索相关文档                             │   │
 │  │     • 返回 top-k 相关片段                                            │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │      │                                                                      │
@@ -111,7 +111,7 @@
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │  6. 保存记忆（PromptX）                                              │   │
 │  │     promptx_remember({                                               │   │
-│  │       role: '{assistantId}-assistant',                              │   │
+│  │       role: '{domainId}-domain',                                     │   │
 │  │       engrams: [{ content: '对话要点', schema: '关键词', ... }]      │   │
 │  │     })                                                               │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
@@ -130,9 +130,9 @@ AgentX 负责 LLM 调用和 WebSocket 通信：
 import { createAgentX, defineAgent } from "agentxjs";
 
 // 定义 Agent
-const AssistantAgent = defineAgent({
-  name: "AssistantAgent",
-  systemPrompt: "你是一个专业的 AI 助手...",
+const DomainAgent = defineAgent({
+  name: "DomainAgent",
+  systemPrompt: "你是一个专业的 AI 知识库...",
   mcpServers: {
     promptx: {
       command: "npx",
@@ -147,36 +147,36 @@ const agentx = await createAgentX({
     apiKey: process.env.CLAUDE_API_KEY,
     baseUrl: "https://api.anthropic.com",
   },
-  agentxDir: `./workspaces/${assistantId}`,
-  defaultAgent: AssistantAgent,
+  agentxDir: `./workspaces/${domainId}`,
+  defaultAgent: DomainAgent,
 });
 ```
 
 ### 5.3 PromptX 调用示例
 
 ```typescript
-// 1. 激活助手角色
+// 1. 激活领域角色
 await mcpClient.call('promptx_action', {
-  role: `${assistantId}-assistant`
+  role: `${domainId}-domain`
 });
 
 // 2. 检索记忆（DMN 模式）
 const memories = await mcpClient.call('promptx_recall', {
-  role: `${assistantId}-assistant`,
+  role: `${domainId}-domain`,
   query: null,  // DMN 模式，查看全景
   mode: 'balanced'
 });
 
 // 3. 检索记忆（关键词模式）
 const relevantMemories = await mcpClient.call('promptx_recall', {
-  role: `${assistantId}-assistant`,
+  role: `${domainId}-domain`,
   query: '用户 偏好 回答风格',
   mode: 'focused'
 });
 
 // 4. 保存记忆
 await mcpClient.call('promptx_remember', {
-  role: `${assistantId}-assistant`,
+  role: `${domainId}-domain`,
   engrams: [{
     content: '用户询问了合同违约条款，偏好详细的法律解释',
     schema: '合同 违约 法律 详细',
@@ -190,12 +190,12 @@ await mcpClient.call('promptx_remember', {
 
 ```typescript
 // 向量检索
-async function searchDocuments(assistantId: string, query: string, topK: number = 5) {
+async function searchDocuments(domainId: string, query: string, topK: number = 5) {
   // 1. 将查询向量化
   const queryVector = await embedText(query);
 
   // 2. 在 Qdrant 中检索
-  const results = await qdrantClient.search(`assistant_${assistantId}`, {
+  const results = await qdrantClient.search(`domain_${domainId}`, {
     vector: queryVector,
     limit: topK,
     with_payload: true,
@@ -280,7 +280,7 @@ ws.onmessage = (event) => {
 ```typescript
 interface Conversation {
   id: string;                    // 格式: conv_xxxxxxxx
-  assistantId: string;
+  domainId: string;
   title: string;
   status: 'active' | 'archived';
   messageCount: number;
@@ -357,7 +357,7 @@ interface SourceReference {
 - [ ] 来源引用
 
 ### Phase 2: PromptX 集成
-- [ ] 助手角色激活（promptx_action）
+- [ ] 领域角色激活（promptx_action）
 - [ ] 记忆检索（promptx_recall）
 - [ ] 记忆保存（promptx_remember）
 - [ ] 对话上下文优化
@@ -379,3 +379,4 @@ interface SourceReference {
 | 3.0 | 2024-12-17 | 添加 Agentic 对话流程 |
 | 3.1 | 2024-12-17 | 更新术语：主角色→助手，子角色→子代理，添加多实例说明 |
 | 4.0 | 2024-12-17 | 简化流程，明确 AgentX/PromptX/Qdrant 职责分工 |
+| 5.0 | 2024-12-19 | 术语重构：助手(Assistant) → 领域(Domain) |

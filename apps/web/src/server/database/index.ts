@@ -90,6 +90,7 @@ async function runMigrations(): Promise<void> {
     { name: '002_default_user', sql: getDefaultUserMigration() },
     { name: '003_add_workspace_path', sql: getWorkspacePathMigration() },
     { name: '004_add_document_fields', sql: getDocumentFieldsMigration() },
+    { name: '005_rename_assistant_to_domain', sql: getRenameAssistantToDomainMigration() },
   ];
 
   // 应用未执行的迁移
@@ -126,13 +127,13 @@ function getInitialSchema(): string {
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
     CREATE INDEX IF NOT EXISTS idx_users_api_key_hash ON users(api_key_hash);
 
-    -- 助手表
-    CREATE TABLE IF NOT EXISTS assistants (
+    -- 领域表（原助手表）
+    CREATE TABLE IF NOT EXISTS domains (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       description TEXT,
-      domain TEXT,
+      expertise TEXT,
       settings TEXT DEFAULT '{}',
       status TEXT DEFAULT 'initializing' CHECK (status IN ('initializing', 'ready', 'processing', 'error')),
       document_count INTEGER DEFAULT 0,
@@ -141,13 +142,13 @@ function getInitialSchema(): string {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE INDEX IF NOT EXISTS idx_assistants_user_id ON assistants(user_id);
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_assistants_user_name ON assistants(user_id, name);
+    CREATE INDEX IF NOT EXISTS idx_domains_user_id ON domains(user_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_domains_user_name ON domains(user_id, name);
 
     -- 文档表
     CREATE TABLE IF NOT EXISTS documents (
       id TEXT PRIMARY KEY,
-      assistant_id TEXT NOT NULL REFERENCES assistants(id) ON DELETE CASCADE,
+      domain_id TEXT NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
       filename TEXT NOT NULL,
       file_type TEXT NOT NULL,
       file_size INTEGER NOT NULL,
@@ -160,13 +161,13 @@ function getInitialSchema(): string {
       processed_at TEXT
     );
 
-    CREATE INDEX IF NOT EXISTS idx_documents_assistant_id ON documents(assistant_id);
+    CREATE INDEX IF NOT EXISTS idx_documents_domain_id ON documents(domain_id);
     CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
 
     -- 对话表
     CREATE TABLE IF NOT EXISTS conversations (
       id TEXT PRIMARY KEY,
-      assistant_id TEXT NOT NULL REFERENCES assistants(id) ON DELETE CASCADE,
+      domain_id TEXT NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
       title TEXT,
       status TEXT DEFAULT 'active' CHECK (status IN ('active', 'archived')),
       message_count INTEGER DEFAULT 0,
@@ -174,7 +175,7 @@ function getInitialSchema(): string {
       last_message_at TEXT
     );
 
-    CREATE INDEX IF NOT EXISTS idx_conversations_assistant_id ON conversations(assistant_id);
+    CREATE INDEX IF NOT EXISTS idx_conversations_domain_id ON conversations(domain_id);
 
     -- 消息表
     CREATE TABLE IF NOT EXISTS messages (
@@ -191,7 +192,7 @@ function getInitialSchema(): string {
     -- 角色表
     CREATE TABLE IF NOT EXISTS roles (
       id TEXT PRIMARY KEY,
-      assistant_id TEXT NOT NULL REFERENCES assistants(id) ON DELETE CASCADE,
+      domain_id TEXT NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       description TEXT,
       prompt_template TEXT,
@@ -203,8 +204,8 @@ function getInitialSchema(): string {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE INDEX IF NOT EXISTS idx_roles_assistant_id ON roles(assistant_id);
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_roles_assistant_name ON roles(assistant_id, name);
+    CREATE INDEX IF NOT EXISTS idx_roles_domain_id ON roles(domain_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_roles_domain_name ON roles(domain_id, name);
 
     -- 记忆表
     CREATE TABLE IF NOT EXISTS memories (
@@ -257,12 +258,12 @@ function getDefaultUserMigration(): string {
 
 /**
  * 工作区路径迁移
- * 为 assistants 表添加 workspace_path 字段
+ * 为 domains 表添加 workspace_path 字段
  */
 function getWorkspacePathMigration(): string {
   return `
-    -- 添加工作区路径字段到 assistants 表
-    ALTER TABLE assistants ADD COLUMN workspace_path TEXT;
+    -- 添加工作区路径字段到 domains 表
+    ALTER TABLE domains ADD COLUMN workspace_path TEXT;
   `;
 }
 
@@ -276,6 +277,52 @@ function getDocumentFieldsMigration(): string {
     ALTER TABLE documents ADD COLUMN file_path TEXT;
     -- 添加重试次数字段到 documents 表
     ALTER TABLE documents ADD COLUMN retry_count INTEGER DEFAULT 0;
+  `;
+}
+
+/**
+ * 重命名 Assistant 到 Domain 迁移
+ * 将 assistants 表重命名为 domains，更新相关外键
+ */
+function getRenameAssistantToDomainMigration(): string {
+  return `
+    -- 如果旧表存在，进行迁移
+    -- 注意：SQLite 不支持直接重命名表的外键，需要重建表
+
+    -- 1. 如果 assistants 表存在且 domains 表不存在，进行迁移
+    CREATE TABLE IF NOT EXISTS domains AS SELECT
+      id,
+      user_id,
+      name,
+      description,
+      domain as expertise,
+      settings,
+      status,
+      document_count,
+      conversation_count,
+      workspace_path,
+      created_at,
+      updated_at
+    FROM assistants WHERE 0=1;
+
+    -- 2. 复制数据（如果 assistants 表有数据）
+    INSERT OR IGNORE INTO domains (id, user_id, name, description, expertise, settings, status, document_count, conversation_count, workspace_path, created_at, updated_at)
+    SELECT id, user_id, name, description, domain, settings, status, document_count, conversation_count, workspace_path, created_at, updated_at
+    FROM assistants;
+
+    -- 3. 更新 documents 表的外键列名（如果存在 assistant_id 列）
+    -- SQLite 不支持直接重命名列，需要重建表
+    -- 这里我们添加新列并复制数据
+    ALTER TABLE documents ADD COLUMN domain_id TEXT;
+    UPDATE documents SET domain_id = assistant_id WHERE domain_id IS NULL;
+
+    -- 4. 更新 conversations 表的外键列名
+    ALTER TABLE conversations ADD COLUMN domain_id TEXT;
+    UPDATE conversations SET domain_id = assistant_id WHERE domain_id IS NULL;
+
+    -- 5. 更新 roles 表的外键列名
+    ALTER TABLE roles ADD COLUMN domain_id TEXT;
+    UPDATE roles SET domain_id = assistant_id WHERE domain_id IS NULL;
   `;
 }
 

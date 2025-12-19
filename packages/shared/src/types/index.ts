@@ -27,10 +27,10 @@ export interface User {
 }
 
 // ============================================
-// 助手相关类型
+// 领域相关类型
 // ============================================
 
-export interface AssistantSettings {
+export interface DomainSettings {
   responseStyle: 'detailed' | 'concise';
   tone: 'formal' | 'friendly';
   language: string;
@@ -40,14 +40,16 @@ export interface AssistantSettings {
   retrievalThreshold: number;
 }
 
-export interface Assistant {
+export type DomainStatus = 'initializing' | 'ready' | 'processing' | 'error';
+
+export interface Domain {
   id: ID;
   userId: ID;
   name: string;
   description?: string;
-  domain?: string;
-  settings: AssistantSettings;
-  status: 'initializing' | 'ready' | 'processing' | 'error';
+  expertise?: string;
+  settings: DomainSettings;
+  status: DomainStatus;
   documentCount: number;
   conversationCount: number;
   workspacePath?: string;
@@ -55,19 +57,29 @@ export interface Assistant {
   updatedAt: Timestamp;
 }
 
-export interface CreateAssistantInput {
+export interface CreateDomainInput {
   name: string;
   description?: string;
-  domain?: string;
-  settings?: Partial<AssistantSettings>;
+  expertise?: string;
+  settings?: Partial<DomainSettings>;
 }
 
-export interface UpdateAssistantInput {
+export interface UpdateDomainInput {
   name?: string;
   description?: string | null;
-  domain?: string | null;
-  settings?: Partial<AssistantSettings>;
+  expertise?: string | null;
+  settings?: Partial<DomainSettings>;
 }
+
+// 向后兼容别名（将在未来版本移除）
+/** @deprecated 使用 DomainSettings 代替 */
+export type AssistantSettings = DomainSettings;
+/** @deprecated 使用 Domain 代替 */
+export type Assistant = Domain;
+/** @deprecated 使用 CreateDomainInput 代替 */
+export type CreateAssistantInput = CreateDomainInput;
+/** @deprecated 使用 UpdateDomainInput 代替 */
+export type UpdateAssistantInput = UpdateDomainInput;
 
 // ============================================
 // 文档相关类型
@@ -85,7 +97,9 @@ export interface DocumentMetadata {
 
 export interface Document {
   id: ID;
-  assistantId: ID;
+  domainId: ID;
+  /** @deprecated 使用 domainId 代替 */
+  assistantId?: ID;
   filename: string;
   fileType: FileType;
   fileSize: number;
@@ -195,7 +209,7 @@ export interface Message {
 
 export interface Conversation {
   id: ID;
-  assistantId: ID;
+  domainId: ID;
   title: string;
   status: 'active' | 'archived';
   messageCount: number;
@@ -204,7 +218,7 @@ export interface Conversation {
 }
 
 export interface CreateConversationInput {
-  assistantId: ID;
+  domainId: ID;
   title?: string;
 }
 
@@ -224,7 +238,7 @@ export interface RolePersonality {
 
 export interface Role {
   id: ID;
-  assistantId: ID;
+  domainId: ID;
   name: string;
   description?: string;
   promptTemplate?: string;

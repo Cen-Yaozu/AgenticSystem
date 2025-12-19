@@ -1,13 +1,12 @@
-import type { Assistant, AssistantSettings, Domain, DomainSettings } from '@agentic-rag/shared';
+import type { Domain, DomainSettings } from '@agentic-rag/shared';
 import { DEFAULT_DOMAIN_SETTINGS, DOMAIN_STATUS } from '@agentic-rag/shared';
 import { getDatabase } from '../database/index.js';
 import { generateId } from '../utils/id.js';
 
 /**
- * @deprecated 使用 DomainRow 代替
- * 数据库中的助手记录类型
+ * 数据库中的领域记录类型
  */
-interface AssistantRow {
+interface DomainRow {
   id: string;
   user_id: string;
   name: string;
@@ -23,45 +22,42 @@ interface AssistantRow {
 }
 
 /**
- * @deprecated 使用 CreateDomainData 代替
- * 创建助手的输入数据
+ * 创建领域的输入数据
  */
-export interface CreateAssistantData {
+export interface CreateDomainData {
   userId: string;
   name: string;
   description?: string;
   expertise?: string;
-  settings?: Partial<AssistantSettings>;
+  settings?: Partial<DomainSettings>;
   workspacePath?: string;
 }
 
 /**
- * @deprecated 使用 UpdateDomainData 代替
- * 更新助手的输入数据
+ * 更新领域的输入数据
  */
-export interface UpdateAssistantData {
+export interface UpdateDomainData {
   name?: string;
   description?: string | null;
   expertise?: string | null;
-  settings?: Partial<AssistantSettings>;
-  status?: Assistant['status'];
+  settings?: Partial<DomainSettings>;
+  status?: Domain['status'];
   workspacePath?: string | null;
 }
 
 /**
- * @deprecated 使用 FindDomainsOptions 代替
- * 查询助手列表的选项
+ * 查询领域列表的选项
  */
-export interface FindAssistantsOptions {
+export interface FindDomainsOptions {
   page?: number;
   pageSize?: number;
   expertise?: string;
 }
 
 /**
- * 将数据库行转换为 Assistant/Domain 对象
+ * 将数据库行转换为 Domain 对象
  */
-function rowToAssistant(row: AssistantRow): Domain {
+function rowToDomain(row: DomainRow): Domain {
   return {
     id: row.id,
     userId: row.user_id,
@@ -79,17 +75,15 @@ function rowToAssistant(row: AssistantRow): Domain {
 }
 
 /**
- * @deprecated 使用 DomainRepository 代替
- * 助手仓库类
+ * 领域仓库类
  */
-export class AssistantRepository {
+export class DomainRepository {
   /**
-   * 按 ID 查询助手
+   * 按 ID 查询领域
    */
   findById(id: string, userId?: string): Domain | null {
     const db = getDatabase();
 
-    // 注意：表名已迁移为 domains
     let sql = 'SELECT * FROM domains WHERE id = ?';
     const params: (string | undefined)[] = [id];
 
@@ -98,14 +92,14 @@ export class AssistantRepository {
       params.push(userId);
     }
 
-    const row = db.prepare(sql).get(...params) as AssistantRow | undefined;
-    return row ? rowToAssistant(row) : null;
+    const row = db.prepare(sql).get(...params) as DomainRow | undefined;
+    return row ? rowToDomain(row) : null;
   }
 
   /**
-   * 按用户 ID 查询助手列表
+   * 按用户 ID 查询领域列表
    */
-  findByUserId(userId: string, options: FindAssistantsOptions = {}): { data: Domain[]; total: number } {
+  findByUserId(userId: string, options: FindDomainsOptions = {}): { data: Domain[]; total: number } {
     const db = getDatabase();
     const { page = 1, pageSize = 20, expertise } = options;
     const offset = (page - 1) * pageSize;
@@ -120,7 +114,6 @@ export class AssistantRepository {
     }
 
     // 查询总数
-    // 注意：表名已迁移为 domains
     const countSql = `SELECT COUNT(*) as count FROM domains ${whereClause}`;
     const countResult = db.prepare(countSql).get(...params) as { count: number };
     const total = countResult.count;
@@ -132,26 +125,26 @@ export class AssistantRepository {
       ORDER BY created_at DESC
       LIMIT ? OFFSET ?
     `;
-    const rows = db.prepare(dataSql).all(...params, pageSize, offset) as AssistantRow[];
+    const rows = db.prepare(dataSql).all(...params, pageSize, offset) as DomainRow[];
 
     return {
-      data: rows.map(rowToAssistant),
+      data: rows.map(rowToDomain),
       total,
     };
   }
 
   /**
-   * 按名称查询助手（用于唯一性检查）
+   * 按名称查询领域（用于唯一性检查）
    */
   findByName(userId: string, name: string): Domain | null {
     const db = getDatabase();
     const sql = 'SELECT * FROM domains WHERE user_id = ? AND name = ?';
-    const row = db.prepare(sql).get(userId, name) as AssistantRow | undefined;
-    return row ? rowToAssistant(row) : null;
+    const row = db.prepare(sql).get(userId, name) as DomainRow | undefined;
+    return row ? rowToDomain(row) : null;
   }
 
   /**
-   * 统计用户的助手数量
+   * 统计用户的领域数量
    */
   countByUserId(userId: string): number {
     const db = getDatabase();
@@ -161,11 +154,10 @@ export class AssistantRepository {
   }
 
   /**
-   * 创建助手
+   * 创建领域
    */
-  create(data: CreateAssistantData): Domain {
+  create(data: CreateDomainData): Domain {
     const db = getDatabase();
-    // 使用新的 dom_ 前缀，但保持向后兼容
     const id = generateId('dom');
     const now = new Date().toISOString();
 
@@ -197,13 +189,13 @@ export class AssistantRepository {
   }
 
   /**
-   * 更新助手
+   * 更新领域
    */
-  update(id: string, data: UpdateAssistantData): Domain | null {
+  update(id: string, data: UpdateDomainData): Domain | null {
     const db = getDatabase();
     const now = new Date().toISOString();
 
-    // 获取当前助手
+    // 获取当前领域
     const current = this.findById(id);
     if (!current) {
       return null;
@@ -256,7 +248,7 @@ export class AssistantRepository {
   }
 
   /**
-   * 删除助手
+   * 删除领域
    */
   delete(id: string): boolean {
     const db = getDatabase();
@@ -266,21 +258,21 @@ export class AssistantRepository {
   }
 
   /**
-   * 更新助手状态为 ready（当初始化完成时）
+   * 更新领域状态为 ready（当初始化完成时）
    */
   markAsReady(id: string): Domain | null {
     return this.update(id, { status: DOMAIN_STATUS.READY as Domain['status'] });
   }
 
   /**
-   * 更新助手状态为 processing
+   * 更新领域状态为 processing
    */
   markAsProcessing(id: string): Domain | null {
     return this.update(id, { status: DOMAIN_STATUS.PROCESSING as Domain['status'] });
   }
 
   /**
-   * 更新助手状态为 error
+   * 更新领域状态为 error
    */
   markAsError(id: string): Domain | null {
     return this.update(id, { status: DOMAIN_STATUS.ERROR as Domain['status'] });
@@ -315,4 +307,16 @@ export class AssistantRepository {
 }
 
 // 导出单例
-export const assistantRepository = new AssistantRepository();
+export const domainRepository = new DomainRepository();
+
+// 向后兼容别名（将在未来版本移除）
+/** @deprecated 使用 DomainRepository 代替 */
+export const AssistantRepository = DomainRepository;
+/** @deprecated 使用 domainRepository 代替 */
+export const assistantRepository = domainRepository;
+/** @deprecated 使用 CreateDomainData 代替 */
+export type CreateAssistantData = CreateDomainData;
+/** @deprecated 使用 UpdateDomainData 代替 */
+export type UpdateAssistantData = UpdateDomainData;
+/** @deprecated 使用 FindDomainsOptions 代替 */
+export type FindAssistantsOptions = FindDomainsOptions;

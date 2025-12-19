@@ -1,16 +1,16 @@
-import type { Assistant, CreateAssistantInput, PaginatedResult, UpdateAssistantInput } from '@agentic-rag/shared';
+import type { CreateDomainInput, Domain, PaginatedResult, UpdateDomainInput } from '@agentic-rag/shared';
 import {
-  ASSISTANT_STATUS,
-  MAX_ASSISTANTS_PER_USER,
-  MAX_ASSISTANT_NAME_LENGTH
+  DOMAIN_STATUS,
+  MAX_DOMAIN_NAME_LENGTH,
+  MAX_DOMAINS_PER_USER
 } from '@agentic-rag/shared';
 import {
-  AssistantCannotDeleteError,
-  AssistantLimitExceededError,
-  AssistantNameDuplicateError,
-  AssistantNameRequiredError,
-  AssistantNameTooLongError,
-  AssistantNotFoundError,
+  DomainCannotDeleteError,
+  DomainLimitExceededError,
+  DomainNameDuplicateError,
+  DomainNameRequiredError,
+  DomainNameTooLongError,
+  DomainNotFoundError
 } from '../errors/business.error.js';
 import {
   assistantRepository,
@@ -20,6 +20,7 @@ import { logger } from '../utils/logger.js';
 import { workspaceService } from './workspace.service.js';
 
 /**
+ * @deprecated 使用 DomainService 代替
  * 助手服务类
  * 处理助手相关的业务逻辑
  */
@@ -27,20 +28,20 @@ export class AssistantService {
   /**
    * 创建助手
    */
-  async createAssistant(userId: string, input: CreateAssistantInput): Promise<Assistant> {
+  async createAssistant(userId: string, input: CreateDomainInput): Promise<Domain> {
     // 验证名称
     this.validateName(input.name);
 
     // 检查名称唯一性
     const existing = assistantRepository.findByName(userId, input.name);
     if (existing) {
-      throw new AssistantNameDuplicateError(input.name);
+      throw new DomainNameDuplicateError(input.name);
     }
 
     // 检查数量限制
     const count = assistantRepository.countByUserId(userId);
-    if (count >= MAX_ASSISTANTS_PER_USER) {
-      throw new AssistantLimitExceededError(MAX_ASSISTANTS_PER_USER);
+    if (count >= MAX_DOMAINS_PER_USER) {
+      throw new DomainLimitExceededError(MAX_DOMAINS_PER_USER);
     }
 
     // 先创建助手记录（获取 ID）
@@ -48,7 +49,7 @@ export class AssistantService {
       userId,
       name: input.name,
       description: input.description,
-      domain: input.domain,
+      expertise: input.expertise,
       settings: input.settings,
     });
 
@@ -82,13 +83,13 @@ export class AssistantService {
   async getAssistants(
     userId: string,
     options: FindAssistantsOptions = {}
-  ): Promise<PaginatedResult<Assistant>> {
-    const { page = 1, pageSize = 20, domain } = options;
+  ): Promise<PaginatedResult<Domain>> {
+    const { page = 1, pageSize = 20, expertise } = options;
 
     const result = assistantRepository.findByUserId(userId, {
       page,
       pageSize,
-      domain,
+      expertise,
     });
 
     return {
@@ -105,11 +106,11 @@ export class AssistantService {
   /**
    * 获取助手详情
    */
-  async getAssistantById(userId: string, assistantId: string): Promise<Assistant> {
+  async getAssistantById(userId: string, assistantId: string): Promise<Domain> {
     const assistant = assistantRepository.findById(assistantId, userId);
 
     if (!assistant) {
-      throw new AssistantNotFoundError(assistantId);
+      throw new DomainNotFoundError(assistantId);
     }
 
     return assistant;
@@ -121,8 +122,8 @@ export class AssistantService {
   async updateAssistant(
     userId: string,
     assistantId: string,
-    input: UpdateAssistantInput
-  ): Promise<Assistant> {
+    input: UpdateDomainInput
+  ): Promise<Domain> {
     // 验证助手存在且属于当前用户
     const assistant = await this.getAssistantById(userId, assistantId);
 
@@ -134,7 +135,7 @@ export class AssistantService {
       if (input.name !== assistant.name) {
         const existing = assistantRepository.findByName(userId, input.name);
         if (existing) {
-          throw new AssistantNameDuplicateError(input.name);
+          throw new DomainNameDuplicateError(input.name);
         }
       }
     }
@@ -143,12 +144,12 @@ export class AssistantService {
     const updated = assistantRepository.update(assistantId, {
       name: input.name,
       description: input.description,
-      domain: input.domain,
+      expertise: input.expertise,
       settings: input.settings,
     });
 
     if (!updated) {
-      throw new AssistantNotFoundError(assistantId);
+      throw new DomainNotFoundError(assistantId);
     }
 
     return updated;
@@ -162,8 +163,8 @@ export class AssistantService {
     const assistant = await this.getAssistantById(userId, assistantId);
 
     // 检查状态：processing 时不能删除
-    if (assistant.status === ASSISTANT_STATUS.PROCESSING) {
-      throw new AssistantCannotDeleteError('Cannot delete assistant while it is processing');
+    if (assistant.status === DOMAIN_STATUS.PROCESSING) {
+      throw new DomainCannotDeleteError('Cannot delete domain while it is processing');
     }
 
     // 先删除工作区目录
@@ -179,7 +180,7 @@ export class AssistantService {
     const deleted = assistantRepository.delete(assistantId);
 
     if (!deleted) {
-      throw new AssistantNotFoundError(assistantId);
+      throw new DomainNotFoundError(assistantId);
     }
 
     // TODO: 清理向量数据库中的数据
@@ -191,18 +192,18 @@ export class AssistantService {
    */
   private validateName(name: string | undefined): void {
     if (!name || name.trim().length === 0) {
-      throw new AssistantNameRequiredError();
+      throw new DomainNameRequiredError();
     }
 
-    if (name.length > MAX_ASSISTANT_NAME_LENGTH) {
-      throw new AssistantNameTooLongError(MAX_ASSISTANT_NAME_LENGTH);
+    if (name.length > MAX_DOMAIN_NAME_LENGTH) {
+      throw new DomainNameTooLongError(MAX_DOMAIN_NAME_LENGTH);
     }
   }
 
   /**
    * 检查助手是否存在且属于指定用户
    */
-  async checkOwnership(userId: string, assistantId: string): Promise<Assistant> {
+  async checkOwnership(userId: string, assistantId: string): Promise<Domain> {
     return this.getAssistantById(userId, assistantId);
   }
 }

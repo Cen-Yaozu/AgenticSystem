@@ -1,8 +1,8 @@
 # 项目初始化指南
 
-> **版本**: 2.0.0
+> **版本**: 3.0.0
 > **状态**: Draft
-> **最后更新**: 2024-12-17
+> **最后更新**: 2024-12-19
 
 ---
 
@@ -48,11 +48,11 @@ agentic-rag/
 │       │   │
 │       │   └── server/               # 后端代码
 │       │       ├── routes/           # API 路由
-│       │       │   └── assistants.ts # 助手路由
+│       │       │   └── domains.ts    # 领域路由
 │       │       ├── services/         # 业务服务
-│       │       │   └── assistant.service.ts
+│       │       │   └── domain.service.ts
 │       │       ├── repositories/     # 数据访问层
-│       │       │   └── assistant.repository.ts
+│       │       │   └── domain.repository.ts
 │       │       ├── database/         # 数据库
 │       │       │   └── index.ts      # SQLite 初始化
 │       │       ├── middleware/       # 中间件
@@ -60,7 +60,7 @@ agentic-rag/
 │       │       │   ├── error.ts      # 错误处理
 │       │       │   └── logger.ts     # 日志中间件
 │       │       ├── validators/       # 数据验证
-│       │       │   └── assistant.validator.ts
+│       │       │   └── domain.validator.ts
 │       │       ├── errors/           # 错误定义
 │       │       │   └── business.error.ts
 │       │       ├── utils/            # 工具函数
@@ -72,8 +72,8 @@ agentic-rag/
 │       │       ├── agentic/          # Agentic 角色系统（待实现）
 │       │       ├── __tests__/        # 测试文件
 │       │       │   ├── setup.ts
-│       │       │   ├── assistant.service.test.ts
-│       │       │   └── assistants.api.test.ts
+│       │       │   ├── domain.service.test.ts
+│       │       │   └── domains.api.test.ts
 │       │       └── index.ts          # 服务器入口
 │       │
 │       ├── public/                   # 静态文件
@@ -98,7 +98,7 @@ agentic-rag/
 │
 ├── spec/                             # 规格文档
 │   ├── SPEC-001-OVERVIEW.md
-│   ├── SPEC-002-ASSISTANT-MANAGEMENT.md
+│   ├── SPEC-002-DOMAIN-MANAGEMENT.md
 │   ├── SPEC-003-DOCUMENT-PROCESSING.md
 │   ├── SPEC-004-CONVERSATION-SYSTEM.md
 │   ├── SPEC-005-ROLE-MEMORY.md
@@ -112,7 +112,7 @@ agentic-rag/
 │   └── features/                     # Gherkin 特性文件
 │
 ├── openspec/                         # OpenSpec 变更管理
-│   ├── AGENTS.md                     # AI 助手指南
+│   ├── AGENTS.md                     # AI 指南
 │   ├── project.md                    # 项目约定
 │   ├── changes/                      # 活跃变更
 │   │   └── archive/                  # 已归档变更
@@ -132,7 +132,7 @@ agentic-rag/
 ├── package.json                      # 根 package.json
 ├── pnpm-workspace.yaml               # pnpm 工作区配置
 ├── pnpm-lock.yaml
-├── AGENTS.md                         # 项目 AI 助手指南
+├── AGENTS.md                         # 项目 AI 指南
 └── README.md
 ```
 
@@ -390,7 +390,7 @@ A:
 
 A:
 ```bash
-pnpm --filter @agentic-rag/web vitest run src/server/__tests__/assistant.service.test.ts
+pnpm --filter @agentic-rag/web vitest run src/server/__tests__/domain.service.test.ts
 ```
 
 ---
@@ -401,3 +401,4 @@ pnpm --filter @agentic-rag/web vitest run src/server/__tests__/assistant.service
 |------|------|----------|
 | 1.0.0 | 2024-12-16 | 初始版本 |
 | 2.0.0 | 2024-12-17 | 更新为实际项目结构（Hono/SQLite/前后端一体） |
+| 3.0.0 | 2024-12-19 | 术语重构：助手(Assistant) → 领域(Domain) |

@@ -1,8 +1,8 @@
 # 数据模型设计
 
-> **版本**: 2.0.0
+> **版本**: 3.0.0
 > **状态**: Draft
-> **最后更新**: 2024-12-17
+> **最后更新**: 2024-12-19
 
 ---
 
@@ -19,7 +19,7 @@
 
 | 文档 | 描述 |
 |------|------|
-| [SPEC-002](../SPEC-002-ASSISTANT-MANAGEMENT.md) | 助手管理需求 |
+| [SPEC-002](../SPEC-002-DOMAIN-MANAGEMENT.md) | 领域管理需求 |
 | [SPEC-003](../SPEC-003-DOCUMENT-PROCESSING.md) | 文档处理需求 |
 | [SPEC-004](../SPEC-004-CONVERSATION-SYSTEM.md) | 对话系统需求 |
 | [SPEC-005](../SPEC-005-ROLE-MEMORY.md) | PromptX 角色与记忆集成 |
@@ -37,7 +37,7 @@
 │  │                         SQLite (业务数据)                            │   │
 │  │                                                                       │   │
 │  │  • users - 用户信息                                                   │   │
-│  │  • assistants - 助手信息                                              │   │
+│  │  • domains - 领域信息                                                 │   │
 │  │  • documents - 文档元数据                                             │   │
 │  │  • conversations - 对话信息                                           │   │
 │  │  • messages - 消息记录                                                │   │
@@ -84,7 +84,7 @@
 │         │ 1:N                                                               │
 │         ▼                                                                   │
 │    ┌──────────────┐                                                         │
-│    │  Assistant   │                                                         │
+│    │    Domain    │                                                         │
 │    │──────────────│                                                         │
 │    │ id           │                                                         │
 │    │ user_id      │                                                         │
@@ -100,7 +100,7 @@
 │  │  Document  │      │ Conversation │                                       │
 │  │────────────│      │──────────────│                                       │
 │  │ id         │      │ id           │                                       │
-│  │ assistant_id│     │ assistant_id │                                       │
+│  │ domain_id  │      │ domain_id    │                                       │
 │  │ filename   │      │ title        │                                       │
 │  │ status     │      │ status       │                                       │
 │  └────────────┘      └──────┬───────┘                                       │
@@ -145,14 +145,14 @@ CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_email ON users(email);
 
 -- ============================================
--- 助手表
+-- 领域表
 -- ============================================
-CREATE TABLE assistants (
-  id TEXT PRIMARY KEY,                    -- 格式: asst_xxxxxxxx
+CREATE TABLE domains (
+  id TEXT PRIMARY KEY,                    -- 格式: dom_xxxxxxxx
   user_id TEXT NOT NULL,                  -- 所属用户
-  name TEXT NOT NULL,                     -- 助手名称
+  name TEXT NOT NULL,                     -- 领域名称
   description TEXT,                       -- 描述
-  domain TEXT,                            -- 领域标签
+  expertise TEXT,                         -- 专业领域标签
   settings TEXT DEFAULT '{}',             -- 设置 (JSON)
   status TEXT DEFAULT 'ready',            -- 状态: initializing|ready|processing|error
   document_count INTEGER DEFAULT 0,       -- 文档数量
@@ -165,15 +165,15 @@ CREATE TABLE assistants (
   UNIQUE(user_id, name)
 );
 
-CREATE INDEX idx_assistants_user_id ON assistants(user_id);
-CREATE INDEX idx_assistants_status ON assistants(status);
+CREATE INDEX idx_domains_user_id ON domains(user_id);
+CREATE INDEX idx_domains_status ON domains(status);
 
 -- ============================================
 -- 文档表
 -- ============================================
 CREATE TABLE documents (
   id TEXT PRIMARY KEY,                    -- 格式: doc_xxxxxxxx
-  assistant_id TEXT NOT NULL,             -- 所属助手
+  domain_id TEXT NOT NULL,                -- 所属领域
   filename TEXT NOT NULL,                 -- 文件名
   file_type TEXT NOT NULL,                -- 文件类型: pdf|docx|txt|md|xlsx
   file_path TEXT NOT NULL,                -- 文件路径
@@ -186,10 +186,10 @@ CREATE TABLE documents (
   uploaded_at INTEGER NOT NULL,
   processed_at INTEGER,
 
-  FOREIGN KEY (assistant_id) REFERENCES assistants(id) ON DELETE CASCADE
+  FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_documents_assistant_id ON documents(assistant_id);
+CREATE INDEX idx_documents_domain_id ON documents(domain_id);
 CREATE INDEX idx_documents_status ON documents(status);
 
 -- ============================================
@@ -197,17 +197,17 @@ CREATE INDEX idx_documents_status ON documents(status);
 -- ============================================
 CREATE TABLE conversations (
   id TEXT PRIMARY KEY,                    -- 格式: conv_xxxxxxxx
-  assistant_id TEXT NOT NULL,             -- 所属助手
+  domain_id TEXT NOT NULL,                -- 所属领域
   title TEXT,                             -- 对话标题
   status TEXT DEFAULT 'active',           -- 状态: active|archived
   message_count INTEGER DEFAULT 0,        -- 消息数量
   started_at INTEGER NOT NULL,
   last_message_at INTEGER NOT NULL,
 
-  FOREIGN KEY (assistant_id) REFERENCES assistants(id) ON DELETE CASCADE
+  FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_conversations_assistant_id ON conversations(assistant_id);
+CREATE INDEX idx_conversations_domain_id ON conversations(domain_id);
 CREATE INDEX idx_conversations_status ON conversations(status);
 CREATE INDEX idx_conversations_last_message_at ON conversations(last_message_at);
 
@@ -258,7 +258,7 @@ interface DocumentVectorPoint {
   payload: {
     chunkId: string;
     documentId: string;
-    assistantId: string;
+    domainId: string;
     userId: string;
     content: string;
     chunkIndex: number;
@@ -274,7 +274,7 @@ interface DocumentVectorPoint {
 
 | 字段 | 索引类型 | 用途 |
 |------|----------|------|
-| assistantId | Keyword | 按助手过滤 |
+| domainId | Keyword | 按领域过滤 |
 | documentId | Keyword | 按文档过滤 |
 | fileType | Keyword | 按类型过滤 |
 
@@ -323,8 +323,8 @@ await mcpClient.call('promptx_recall', {
 
 | 实体 | 字段 | 约束 |
 |------|------|------|
-| Assistant | name | 1-100 字符，同用户下唯一 |
-| Assistant | description | 最多 500 字符 |
+| Domain | name | 1-100 字符，同用户下唯一 |
+| Domain | description | 最多 500 字符 |
 | Document | fileSize | 最大 10MB |
 | Message | content | 1-10000 字符 |
 
@@ -332,8 +332,8 @@ await mcpClient.call('promptx_recall', {
 
 | 实体 | 限制 | 说明 |
 |------|------|------|
-| 每用户助手数 | 10 | MVP 阶段限制 |
-| 每助手文档数 | 100 | MVP 阶段限制 |
+| 每用户领域数 | 10 | MVP 阶段限制 |
+| 每领域文档数 | 100 | MVP 阶段限制 |
 | 每对话消息数 | 1000 | MVP 阶段限制 |
 
 ---
@@ -353,7 +353,7 @@ const db = new Database(process.env.DATABASE_PATH || './data/agentic-rag.db');
 // 创建表
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (...);
-  CREATE TABLE IF NOT EXISTS assistants (...);
+  CREATE TABLE IF NOT EXISTS domains (...);
   CREATE TABLE IF NOT EXISTS documents (...);
   CREATE TABLE IF NOT EXISTS conversations (...);
   CREATE TABLE IF NOT EXISTS messages (...);
@@ -369,7 +369,7 @@ sqlite3 data/agentic-rag.db
 # 常用命令
 .tables          # 列出所有表
 .schema users    # 查看表结构
-SELECT * FROM assistants;  # 查询数据
+SELECT * FROM domains;  # 查询数据
 .quit            # 退出
 ```
 
@@ -388,3 +388,4 @@ rm data/agentic-rag.db*
 |------|------|----------|
 | 1.0.0 | 2024-12-16 | 初始版本（Prisma/PostgreSQL） |
 | 2.0.0 | 2024-12-17 | 改为 SQLite，移除角色/记忆表（由 PromptX 提供） |
+| 3.0.0 | 2024-12-19 | 术语重构：助手(Assistant) → 领域(Domain) |

@@ -29,13 +29,13 @@ function createTestSchema(db: Database.Database): void {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- 助手表
-    CREATE TABLE IF NOT EXISTS assistants (
+    -- 领域表（原助手表）
+    CREATE TABLE IF NOT EXISTS domains (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       description TEXT,
-      domain TEXT,
+      expertise TEXT,
       settings TEXT DEFAULT '{}',
       status TEXT DEFAULT 'initializing' CHECK (status IN ('initializing', 'ready', 'processing', 'error')),
       document_count INTEGER DEFAULT 0,
@@ -45,8 +45,8 @@ function createTestSchema(db: Database.Database): void {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE INDEX IF NOT EXISTS idx_assistants_user_id ON assistants(user_id);
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_assistants_user_name ON assistants(user_id, name);
+    CREATE INDEX IF NOT EXISTS idx_domains_user_id ON domains(user_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_domains_user_name ON domains(user_id, name);
 
     -- 插入测试用户
     INSERT INTO users (id, name, email, status, created_at, updated_at)
@@ -113,8 +113,8 @@ describe('AssistantService', () => {
   });
 
   beforeEach(() => {
-    // 清空助手表数据
-    testDb.exec('DELETE FROM assistants');
+    // 清空领域表数据
+    testDb.exec('DELETE FROM domains');
   });
 
   describe('createAssistant', () => {
@@ -122,14 +122,14 @@ describe('AssistantService', () => {
       const result = await service.createAssistant(TEST_USER_ID, {
         name: '测试助手',
         description: '这是一个测试助手',
-        domain: 'test',
+        expertise: 'test',
       });
 
       expect(result).toBeDefined();
-      expect(result.id).toMatch(/^ast_/);
+      expect(result.id).toMatch(/^dom_/);
       expect(result.name).toBe('测试助手');
       expect(result.description).toBe('这是一个测试助手');
-      expect(result.domain).toBe('test');
+      expect(result.expertise).toBe('test');
       expect(result.userId).toBe(TEST_USER_ID);
       expect(result.status).toBe('initializing');
       expect(result.settings).toBeDefined();
@@ -176,9 +176,9 @@ describe('AssistantService', () => {
   describe('getAssistants', () => {
     beforeEach(async () => {
       // 创建测试数据
-      await service.createAssistant(TEST_USER_ID, { name: '助手A', domain: 'legal' });
-      await service.createAssistant(TEST_USER_ID, { name: '助手B', domain: 'medical' });
-      await service.createAssistant(TEST_USER_ID, { name: '助手C', domain: 'legal' });
+      await service.createAssistant(TEST_USER_ID, { name: '助手A', expertise: 'legal' });
+      await service.createAssistant(TEST_USER_ID, { name: '助手B', expertise: 'medical' });
+      await service.createAssistant(TEST_USER_ID, { name: '助手C', expertise: 'legal' });
     });
 
     it('应该返回所有助手列表', async () => {
@@ -200,13 +200,13 @@ describe('AssistantService', () => {
       expect(result.meta.totalPages).toBe(2);
     });
 
-    it('应该支持按 domain 筛选', async () => {
+    it('应该支持按 expertise 筛选', async () => {
       const result = await service.getAssistants(TEST_USER_ID, {
-        domain: 'legal',
+        expertise: 'legal',
       });
 
       expect(result.data).toHaveLength(2);
-      expect(result.data.every(a => a.domain === 'legal')).toBe(true);
+      expect(result.data.every(a => a.expertise === 'legal')).toBe(true);
     });
 
     it('应该按创建时间倒序排列', async () => {
@@ -279,7 +279,7 @@ describe('AssistantService', () => {
       const created = await service.createAssistant(TEST_USER_ID, {
         name: '部分更新测试',
         description: '原始描述',
-        domain: 'test',
+        expertise: 'test',
       });
 
       const result = await service.updateAssistant(TEST_USER_ID, created.id, {
@@ -288,7 +288,7 @@ describe('AssistantService', () => {
 
       expect(result.name).toBe('部分更新测试');
       expect(result.description).toBe('只更新描述');
-      expect(result.domain).toBe('test');
+      expect(result.expertise).toBe('test');
     });
 
     it('应该在更新为重复名称时抛出错误', async () => {
@@ -332,7 +332,7 @@ describe('AssistantService', () => {
       });
 
       // 手动更新状态为 processing
-      testDb.prepare('UPDATE assistants SET status = ? WHERE id = ?').run('processing', created.id);
+      testDb.prepare('UPDATE domains SET status = ? WHERE id = ?').run('processing', created.id);
 
       await expect(
         service.deleteAssistant(TEST_USER_ID, created.id)

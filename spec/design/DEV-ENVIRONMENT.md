@@ -1,8 +1,8 @@
 # 开发环境配置指南
 
-> **版本**: 2.0.0
+> **版本**: 3.0.0
 > **状态**: Draft
-> **最后更新**: 2024-12-17
+> **最后更新**: 2024-12-19
 
 ---
 
@@ -335,7 +335,7 @@ pnpm test
 pnpm --filter @agentic-rag/web test:watch
 
 # 运行特定测试文件
-pnpm --filter @agentic-rag/web vitest run src/server/__tests__/assistant.service.test.ts
+pnpm --filter @agentic-rag/web vitest run src/server/__tests__/domain.service.test.ts
 ```
 
 ### 5.3 代码检查
@@ -419,7 +419,7 @@ sqlite3 data/agentic-rag.db
 # 常用命令
 .tables          # 列出所有表
 .schema users    # 查看表结构
-SELECT * FROM assistants;  # 查询数据
+SELECT * FROM domains;  # 查询数据
 .quit            # 退出
 ```
 
@@ -440,14 +440,14 @@ rm data/agentic-rag.db*
 # 健康检查
 curl http://localhost:3000/api/v1/health
 
-# 创建助手（需要 API Key）
-curl -X POST http://localhost:3000/api/v1/assistants \
+# 创建领域（需要 API Key）
+curl -X POST http://localhost:3000/api/v1/domains \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
-  -d '{"name": "测试助手", "description": "这是一个测试助手"}'
+  -d '{"name": "测试领域", "description": "这是一个测试领域"}'
 
-# 获取助手列表
-curl http://localhost:3000/api/v1/assistants \
+# 获取领域列表
+curl http://localhost:3000/api/v1/domains \
   -H "X-API-Key: your-api-key"
 ```
 
@@ -460,11 +460,11 @@ brew install httpie  # macOS
 # 健康检查
 http GET localhost:3000/api/v1/health
 
-# 创建助手
-http POST localhost:3000/api/v1/assistants \
+# 创建领域
+http POST localhost:3000/api/v1/domains \
   X-API-Key:your-api-key \
-  name="测试助手" \
-  description="这是一个测试助手"
+  name="测试领域" \
+  description="这是一个测试领域"
 ```
 
 ---
@@ -498,19 +498,18 @@ docker-compose restart qdrant
 docker-compose logs qdrant
 ```
 
-### Q: 数据库锁定错误怎么办？
+### Q: 数据库迁移失败怎么办？
 
-A: SQLite 在高并发时可能出现锁定。解决方案：
-1. 确保只有一个开发服务器在运行
-2. 重启开发服务器
-3. 如果问题持续，删除 `.db-shm` 和 `.db-wal` 文件
+A:
+```bash
+# 备份数据库
+cp data/agentic-rag.db data/agentic-rag.db.backup
 
-### Q: 如何查看详细日志？
+# 删除数据库重新创建
+rm data/agentic-rag.db*
 
-A: 设置环境变量 `LOG_LEVEL=debug`，或在代码中使用 logger：
-```typescript
-import { logger } from './utils/logger';
-logger.debug('调试信息');
+# 重启服务
+pnpm dev
 ```
 
 ---
@@ -520,4 +519,5 @@ logger.debug('调试信息');
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
 | 1.0.0 | 2024-12-16 | 初始版本 |
-| 2.0.0 | 2024-12-17 | 更新为实际项目配置（SQLite/Hono/简化认证） |
+| 2.0.0 | 2024-12-17 | 更新为实际项目配置 |
+| 3.0.0 | 2024-12-19 | 术语重构：助手(Assistant) → 领域(Domain) |

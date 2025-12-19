@@ -15,7 +15,7 @@ import { generateId } from '../utils/id.js';
  */
 interface DocumentRow {
   id: string;
-  assistant_id: string;
+  domain_id: string;
   filename: string;
   file_type: string;
   file_size: number;
@@ -34,14 +34,18 @@ interface DocumentRow {
  * 创建文档的输入数据（仓库层）
  */
 export interface CreateDocumentData extends CreateDocumentInput {
-  assistantId: string;
+  domainId: string;
+  /** @deprecated Use domainId instead */
+  assistantId?: string;
 }
 
 /**
  * 查询文档列表的选项
  */
 export interface FindDocumentsOptions extends DocumentListParams {
-  assistantId: string;
+  domainId: string;
+  /** @deprecated Use domainId instead */
+  assistantId?: string;
 }
 
 /**
@@ -50,7 +54,9 @@ export interface FindDocumentsOptions extends DocumentListParams {
 function rowToDocument(row: DocumentRow): Document {
   return {
     id: row.id,
-    assistantId: row.assistant_id,
+    domainId: row.domain_id,
+    // 向后兼容：同时提供 assistantId
+    assistantId: row.domain_id,
     filename: row.filename,
     fileType: row.file_type as FileType,
     fileSize: row.file_size,
@@ -73,15 +79,15 @@ export class DocumentRepository {
   /**
    * 按 ID 查询文档
    */
-  findById(id: string, assistantId?: string): Document | null {
+  findById(id: string, domainId?: string): Document | null {
     const db = getDatabase();
 
     let sql = 'SELECT * FROM documents WHERE id = ?';
     const params: string[] = [id];
 
-    if (assistantId) {
-      sql += ' AND assistant_id = ?';
-      params.push(assistantId);
+    if (domainId) {
+      sql += ' AND domain_id = ?';
+      params.push(domainId);
     }
 
     const row = db.prepare(sql).get(...params) as DocumentRow | undefined;
@@ -89,16 +95,16 @@ export class DocumentRepository {
   }
 
   /**
-   * 按助手 ID 查询文档列表
+   * 按领域 ID 查询文档列表
    */
-  findByAssistantId(options: FindDocumentsOptions): { data: Document[]; total: number } {
+  findByDomainId(options: FindDocumentsOptions): { data: Document[]; total: number } {
     const db = getDatabase();
-    const { assistantId, page = 1, pageSize = 20, status } = options;
+    const { domainId, page = 1, pageSize = 20, status } = options;
     const offset = (page - 1) * pageSize;
 
     // 构建查询条件
-    let whereClause = 'WHERE assistant_id = ?';
-    const params: (string | number)[] = [assistantId];
+    let whereClause = 'WHERE domain_id = ?';
+    const params: (string | number)[] = [domainId];
 
     if (status) {
       whereClause += ' AND status = ?';
@@ -126,22 +132,36 @@ export class DocumentRepository {
   }
 
   /**
-   * 统计助手的文档数量
+   * @deprecated Use findByDomainId instead
+   */
+  findByAssistantId(options: FindDocumentsOptions): { data: Document[]; total: number } {
+    return this.findByDomainId(options);
+  }
+
+  /**
+   * 统计领域的文档数量
+   */
+  countByDomainId(domainId: string): number {
+    const db = getDatabase();
+    const sql = 'SELECT COUNT(*) as count FROM documents WHERE domain_id = ?';
+    const result = db.prepare(sql).get(domainId) as { count: number };
+    return result.count;
+  }
+
+  /**
+   * @deprecated Use countByDomainId instead
    */
   countByAssistantId(assistantId: string): number {
-    const db = getDatabase();
-    const sql = 'SELECT COUNT(*) as count FROM documents WHERE assistant_id = ?';
-    const result = db.prepare(sql).get(assistantId) as { count: number };
-    return result.count;
+    return this.countByDomainId(assistantId);
   }
 
   /**
    * 按状态统计文档数量
    */
-  countByStatus(assistantId: string, status: DocumentStatus): number {
+  countByStatus(domainId: string, status: DocumentStatus): number {
     const db = getDatabase();
-    const sql = 'SELECT COUNT(*) as count FROM documents WHERE assistant_id = ? AND status = ?';
-    const result = db.prepare(sql).get(assistantId, status) as { count: number };
+    const sql = 'SELECT COUNT(*) as count FROM documents WHERE domain_id = ? AND status = ?';
+    const result = db.prepare(sql).get(domainId, status) as { count: number };
     return result.count;
   }
 
@@ -152,10 +172,12 @@ export class DocumentRepository {
     const db = getDatabase();
     const id = generateId('doc');
     const now = new Date().toISOString();
+    // 支持 domainId 或向后兼容的 assistantId
+    const domainId = data.domainId || data.assistantId;
 
     const sql = `
       INSERT INTO documents (
-        id, assistant_id, filename, file_type, file_size, file_path,
+        id, domain_id, filename, file_type, file_size, file_path,
         status, progress, error_message, chunk_count, retry_count, metadata,
         uploaded_at, processed_at
       )
@@ -164,7 +186,7 @@ export class DocumentRepository {
 
     db.prepare(sql).run(
       id,
-      data.assistantId,
+      domainId,
       data.filename,
       data.fileType,
       data.fileSize,
@@ -249,13 +271,20 @@ export class DocumentRepository {
   }
 
   /**
-   * 按助手 ID 删除所有文档
+   * 按领域 ID 删除所有文档
+   */
+  deleteByDomainId(domainId: string): number {
+    const db = getDatabase();
+    const sql = 'DELETE FROM documents WHERE domain_id = ?';
+    const result = db.prepare(sql).run(domainId);
+    return result.changes;
+  }
+
+  /**
+   * @deprecated Use deleteByDomainId instead
    */
   deleteByAssistantId(assistantId: string): number {
-    const db = getDatabase();
-    const sql = 'DELETE FROM documents WHERE assistant_id = ?';
-    const result = db.prepare(sql).run(assistantId);
-    return result.changes;
+    return this.deleteByDomainId(assistantId);
   }
 
   /**

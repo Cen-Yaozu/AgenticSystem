@@ -46,7 +46,7 @@ assistants.get(
     const result = await assistantService.getAssistants(user.userId, {
       page: query.page,
       pageSize: query.pageSize,
-      domain: query.domain,
+      expertise: query.expertise,
     });
 
     return successWithPagination(c, result.data, {

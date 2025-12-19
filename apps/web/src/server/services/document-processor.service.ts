@@ -34,7 +34,7 @@ export async function processDocument(
   document: Document,
   onProgress?: ProgressCallback
 ): Promise<void> {
-  const { id: documentId, assistantId, filename, fileType, filePath } = document;
+  const { id: documentId, domainId, filename, fileType, filePath } = document;
 
   logger.info(`[Processor] 开始处理文档: ${filename} (${documentId})`);
 
@@ -92,7 +92,7 @@ export async function processDocument(
     onProgress?.({ stage: 'indexing', progress: 80, message: '存储向量...' });
 
     // 先删除旧的向量（如果是重新处理）
-    await deletePointsByDocument(assistantId, documentId);
+    await deletePointsByDocument(domainId, documentId);
 
     // 构建向量点
     const vectorPoints: VectorPoint[] = chunks.map((chunk, index) => {
@@ -115,7 +115,7 @@ export async function processDocument(
     });
 
     // 插入向量
-    await upsertPoints(assistantId, vectorPoints);
+    await upsertPoints(domainId, vectorPoints);
 
     logger.info(`[Processor] 向量存储完成: ${filename}`);
 
@@ -161,18 +161,18 @@ export async function reprocessDocument(documentId: string): Promise<void> {
 
 /**
  * 批量处理待处理的文档
- * @param assistantId 助手 ID（可选，不传则处理所有）
+ * @param domainId 领域 ID（可选，不传则处理所有）
  * @param limit 处理数量限制
  */
 export async function processPendingDocuments(
-  assistantId?: string,
+  domainId?: string,
   limit: number = 10
 ): Promise<{ processed: number; failed: number }> {
   const pendingDocs = await documentRepository.findPendingDocuments(limit);
 
-  // 如果指定了助手 ID，则过滤
-  const docsToProcess = assistantId
-    ? pendingDocs.filter((doc) => doc.assistantId === assistantId)
+  // 如果指定了领域 ID，则过滤
+  const docsToProcess = domainId
+    ? pendingDocs.filter((doc) => doc.domainId === domainId)
     : pendingDocs;
 
   let processed = 0;

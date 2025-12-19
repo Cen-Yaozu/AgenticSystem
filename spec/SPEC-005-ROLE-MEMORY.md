@@ -1,6 +1,6 @@
 # SPEC-005: PromptX 集成
 
-> 版本: 5.0 | 状态: Draft | 日期: 2024-12-17
+> 版本: 6.0 | 状态: Draft | 日期: 2024-12-19
 
 ## 1. 概述
 
@@ -42,7 +42,7 @@
 |------|------|
 | AgentX | AI Agent 开发框架，负责 LLM 调用和 WebSocket |
 | PromptX | MCP 服务器，提供角色、记忆、工具 |
-| 工作区（Workspace） | AgentX 概念，一个助手 = 一个工作区 |
+| 工作区（Workspace） | AgentX 概念，一个领域 = 一个工作区 |
 | 角色（Role） | PromptX 中的角色资源 |
 | 记忆（Engrams） | PromptX 中的记忆单元 |
 
@@ -57,9 +57,9 @@
 PromptX 提供角色资源，通过 MCP 调用来激活角色：
 
 ```typescript
-// 激活助手角色
+// 激活领域角色
 await mcpClient.call('promptx_action', {
-  role: `${assistantId}-assistant`  // 助手角色（创建助手时通过女娲创建）
+  role: `${domainId}-domain`  // 领域角色（创建领域时通过女娲创建）
 });
 ```
 
@@ -74,8 +74,8 @@ await mcpClient.call('toolx', {
   yaml: `tool: tool://role-creator
 mode: execute
 parameters:
-  name: ${assistantId}-assistant
-  domain: ${domain}
+  name: ${domainId}-domain
+  expertise: ${expertise}
   description: ${description}`
 });
 ```
@@ -87,7 +87,7 @@ PromptX 提供记忆系统（Engrams），我们通过 MCP 调用来保存和检
 ```typescript
 // 保存记忆
 await mcpClient.call('promptx_remember', {
-  role: 'legal-assistant',
+  role: 'legal-domain',
   engrams: [{
     content: '用户偏好简洁的回答风格',
     schema: '用户 偏好 简洁 回答',
@@ -98,14 +98,14 @@ await mcpClient.call('promptx_remember', {
 
 // 检索记忆 - DMN 模式（查看全景）
 await mcpClient.call('promptx_recall', {
-  role: 'legal-assistant',
+  role: 'legal-domain',
   query: null,
   mode: 'balanced'
 });
 
 // 检索记忆 - 关键词模式
 await mcpClient.call('promptx_recall', {
-  role: 'legal-assistant',
+  role: 'legal-domain',
   query: '用户 偏好',
   mode: 'focused'
 });
@@ -160,7 +160,7 @@ parameters:
 
 | 职责 | 说明 |
 |------|------|
-| 助手管理 | 创建、更新、删除助手（业务实体） |
+| 领域管理 | 创建、更新、删除领域（业务实体） |
 | 工作区管理 | 创建 AgentX 工作区 |
 | 角色创建 | 通过女娲创建 PromptX 角色 |
 | MCP 调用 | 在对话过程中调用 PromptX 的角色和记忆接口 |
@@ -175,7 +175,7 @@ parameters:
 
 ## 4. 工作区与角色
 
-### 4.1 一个助手 = 一个工作区
+### 4.1 一个领域 = 一个工作区
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -183,13 +183,13 @@ parameters:
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  workspaces/                                                                │
-│  └── {assistantId}/                    # AgentX 工作区                      │
-│      ├── .promptx/                     # PromptX 资源目录                   │
+│  └── {domainId}/                        # AgentX 工作区                      │
+│      ├── .promptx/                      # PromptX 资源目录                   │
 │      │   └── resource/                                                      │
 │      │       └── role/                                                      │
-│      │           └── {assistantId}-assistant.role.md  # 助手角色定义        │
-│      ├── mcp.json                      # MCP 配置                           │
-│      └── documents/                    # 文档存储                           │
+│      │           └── {domainId}-domain.role.md  # 领域角色定义               │
+│      ├── mcp.json                       # MCP 配置                           │
+│      └── documents/                     # 文档存储                           │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -198,7 +198,7 @@ parameters:
 
 | 类型 | 命名格式 | 示例 |
 |------|----------|------|
-| 助手角色 | `{assistantId}-assistant` | `ast_xxx-assistant` |
+| 领域角色 | `{domainId}-domain` | `dom_xxx-domain` |
 | 系统角色 | PromptX 内置 | `nuwa`, `luban`, `writer` |
 
 ### 4.3 PromptX 系统角色
@@ -212,27 +212,27 @@ parameters:
 
 ## 5. 集成流程
 
-### 5.1 创建助手流程
+### 5.1 创建领域流程
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           创建助手流程                                       │
+│                           创建领域流程                                       │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  1. 创建业务实体                                                            │
-│     INSERT INTO assistants (id, name, domain, ...)                         │
+│     INSERT INTO domains (id, name, expertise, ...)                          │
 │                                                                             │
 │  2. 创建 AgentX 工作区                                                      │
-│     mkdir workspaces/{assistantId}                                         │
+│     mkdir workspaces/{domainId}                                             │
 │                                                                             │
 │  3. 激活女娲角色                                                            │
 │     promptx_action({ role: 'nuwa' })                                       │
 │                                                                             │
-│  4. 创建助手角色                                                            │
+│  4. 创建领域角色                                                            │
 │     toolx({ tool: 'tool://role-creator', ... })                            │
 │                                                                             │
 │  5. 保存角色 ID                                                             │
-│     UPDATE assistants SET promptxRoleId = '{assistantId}-assistant'        │
+│     UPDATE domains SET promptxRoleId = '{domainId}-domain'                  │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -247,16 +247,16 @@ parameters:
 │  用户消息                                                                   │
 │      │                                                                      │
 │      ▼                                                                      │
-│  1. 激活助手角色                                                            │
-│     promptx_action({ role: '{assistantId}-assistant' })                    │
+│  1. 激活领域角色                                                            │
+│     promptx_action({ role: '{domainId}-domain' })                           │
 │      │                                                                      │
 │      ▼                                                                      │
 │  2. 检索记忆                                                                │
-│     promptx_recall({ role: '{assistantId}-assistant', query: null })       │
+│     promptx_recall({ role: '{domainId}-domain', query: null })              │
 │      │                                                                      │
 │      ▼                                                                      │
 │  3. 向量检索（Qdrant）                                                      │
-│     qdrant.search('assistant_{assistantId}', query)                        │
+│     qdrant.search('domain_{domainId}', query)                               │
 │      │                                                                      │
 │      ▼                                                                      │
 │  4. LLM 调用（AgentX）                                                      │
@@ -264,7 +264,7 @@ parameters:
 │      │                                                                      │
 │      ▼                                                                      │
 │  5. 保存记忆                                                                │
-│     promptx_remember({ role: '{assistantId}-assistant', engrams: [...] })  │
+│     promptx_remember({ role: '{domainId}-domain', engrams: [...] })         │
 │      │                                                                      │
 │      ▼                                                                      │
 │  流式响应                                                                   │
@@ -275,7 +275,7 @@ parameters:
 ## 6. 验收标准
 
 - [ ] 能够通过 MCP 连接 PromptX
-- [ ] 能够激活助手角色（promptx_action）
+- [ ] 能够激活领域角色（promptx_action）
 - [ ] 能够保存记忆（promptx_remember）
 - [ ] 能够检索记忆（promptx_recall）
 - [ ] 能够调用工具（toolx）
@@ -285,7 +285,7 @@ parameters:
 
 ### Phase 1: 基础集成（MVP）
 - [ ] PromptX MCP 连接
-- [ ] 助手角色激活
+- [ ] 领域角色激活
 - [ ] 基础记忆调用
 
 ### Phase 2: 完整集成
@@ -310,3 +310,4 @@ parameters:
 | 4.0 | 2024-12-17 | 重构：明确角色和记忆由 PromptX 提供，业务层只需调用 |
 | 4.1 | 2024-12-17 | 补充子代理的核心价值：领域细分，提升检索精准度 |
 | 5.0 | 2024-12-17 | 添加 AgentX/工作区概念，添加工具系统说明，简化角色体系 |
+| 6.0 | 2024-12-19 | 术语重构：助手(Assistant) → 领域(Domain) |

@@ -1,8 +1,8 @@
 # 技术架构设计
 
-> **版本**: 2.0.0
+> **版本**: 3.0.0
 > **状态**: Draft
-> **最后更新**: 2024-12-17
+> **最后更新**: 2024-12-19
 
 ---
 
@@ -52,7 +52,7 @@
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                       服务层 (Services)                              │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │   │
-│  │  │  Assistant  │  │  Document   │  │Conversation │  │    RAG     │  │   │
+│  │  │   Domain    │  │  Document   │  │Conversation │  │    RAG     │  │   │
 │  │  │  Service    │  │  Service    │  │  Service    │  │  Service   │  │   │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘  │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
@@ -84,9 +84,9 @@
 │  │  │        SQLite           │  │           Qdrant                │   │   │
 │  │  │   (关系数据 + 文件)     │  │        (向量数据)               │   │   │
 │  │  │  - users                │  │  - document_vectors             │   │   │
-│  │  │  - assistants           │  │    - chunkId                    │   │   │
+│  │  │  - domains              │  │    - chunkId                    │   │   │
 │  │  │  - documents            │  │    - documentId                 │   │   │
-│  │  │  - conversations        │  │    - assistantId                │   │   │
+│  │  │  - conversations        │  │    - domainId                   │   │   │
 │  │  │  - messages             │  │    - content                    │   │   │
 │  │  │  - roles                │  │    - summary                    │   │   │
 │  │  │  - memories             │  │                                 │   │   │
@@ -390,3 +390,4 @@ EMBEDDING_DIMENSIONS=1536
 |------|------|----------|
 | 1.0.0 | 2024-12-16 | 初始版本 |
 | 2.0.0 | 2024-12-17 | 更新技术栈（Hono/SQLite），添加 Agentic 架构引用 |
+| 3.0.0 | 2024-12-19 | 术语重构：助手(Assistant) → 领域(Domain) |

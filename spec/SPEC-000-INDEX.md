@@ -1,8 +1,8 @@
 # 📋 AgentX Agentic RAG 系统规格说明书
 
-> **版本**: 2.0.0
+> **版本**: 3.0.0
 > **状态**: ✅ Complete
-> **最后更新**: 2024-12-16
+> **最后更新**: 2024-12-19
 
 ---
 
@@ -25,7 +25,7 @@
 ### 🔧 功能规格
 | 编号 | 文档 | 描述 | 状态 |
 |------|------|------|------|
-| SPEC-002 | [助手管理](./SPEC-002-ASSISTANT-MANAGEMENT.md) | 助手的创建、配置、删除 | ✅ Complete |
+| SPEC-002 | [领域管理](./SPEC-002-DOMAIN-MANAGEMENT.md) | 领域的创建、配置、删除 | ✅ Complete |
 | SPEC-003 | [文档处理](./SPEC-003-DOCUMENT-PROCESSING.md) | 文档上传、解析、向量化 | ✅ Complete |
 | SPEC-004 | [对话系统](./SPEC-004-CONVERSATION-SYSTEM.md) | 智能问答、流式响应 | ✅ Complete |
 | SPEC-005 | [角色与记忆](./SPEC-005-ROLE-MEMORY.md) | 角色调度、记忆管理 | ✅ Complete |
@@ -44,10 +44,10 @@
 ### 📁 Gherkin 特性文件
 | 目录 | 文件 | 描述 |
 |------|------|------|
-| [features/assistant/](./features/assistant/) | 002-create-assistant.feature | 创建助手 |
-| | 002-query-assistant.feature | 查询助手 |
-| | 002-update-assistant.feature | 更新助手 |
-| | 002-delete-assistant.feature | 删除助手 |
+| [features/domain/](./features/domain/) | 002-create-domain.feature | 创建领域 |
+| | 002-query-domain.feature | 查询领域 |
+| | 002-update-domain.feature | 更新领域 |
+| | 002-delete-domain.feature | 删除领域 |
 | [features/document/](./features/document/) | 003-upload-document.feature | 上传文档 |
 | | 003-process-document.feature | 处理文档 |
 | | 003-manage-documents.feature | 管理文档 |
@@ -80,7 +80,7 @@ spec/
 │   ├── DEV-ENVIRONMENT.md
 │   └── IMPLEMENTATION-ROADMAP.md
 └── features/                   # Gherkin 验收标准
-    ├── assistant/
+    ├── domain/
     ├── document/
     ├── conversation/
     └── role-memory/
@@ -106,6 +106,7 @@ spec/
 
 | 版本 | 日期 | 变更说明 |
 |------|------|----------|
+| 3.0.0 | 2024-12-19 | 术语重构：助手(Assistant) → 领域(Domain) |
 | 2.0.0 | 2024-12-16 | 重构文档结构，分离技术设计和验收标准 |
 | 1.0.0 | 2024-12-16 | 初始版本 |
 

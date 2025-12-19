@@ -1,15 +1,15 @@
 
 # Agentic 多角色架构设计
 
-> **版本**: 2.0.0
+> **版本**: 3.0.0
 > **状态**: Draft
-> **最后更新**: 2024-12-17
+> **最后更新**: 2024-12-19
 
 ---
 
 ## 1. 概述
 
-本文档定义 AgentX Agentic RAG 系统的核心架构模式：**助手-子代理协作系统**。
+本文档定义 AgentX Agentic RAG 系统的核心架构模式：**领域角色-子代理协作系统**。
 
 ### 1.1 什么是 Agentic 架构
 
@@ -20,7 +20,7 @@
 
 Agentic RAG 系统采用**智能代理协作**模式：
 ```
-用户输入 → 助手分析 → 委派子代理 → 智能处理 → 协调整合 → 输出
+用户输入 → 领域角色分析 → 委派子代理 → 智能处理 → 协调整合 → 输出
 ```
 
 ### 1.2 核心理念
@@ -28,8 +28,8 @@ Agentic RAG 系统采用**智能代理协作**模式：
 | 理念 | 描述 |
 |------|------|
 | **角色即专家** | 每个角色是特定领域的专家，拥有专业知识和记忆 |
-| **助手-子代理协作** | 助手（主角色）负责协调，子代理负责执行具体任务 |
-| **智能委派** | 助手根据任务类型智能选择合适的子代理 |
+| **领域角色-子代理协作** | 领域角色（主角色）负责协调，子代理负责执行具体任务 |
+| **智能委派** | 领域角色根据任务类型智能选择合适的子代理 |
 | **记忆驱动** | 角色通过 PromptX 记忆系统积累经验，越用越智能 |
 
 ### 1.3 技术栈分工
@@ -42,7 +42,7 @@ Agentic RAG 系统采用**智能代理协作**模式：
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                    业务层 (Agentic RAG 应用)                         │   │
 │  │                                                                       │   │
-│  │  • 助手管理 (Assistant CRUD)                                         │   │
+│  │  • 领域管理 (Domain CRUD)                                            │   │
 │  │  • 文档管理 (Document CRUD)                                          │   │
 │  │  • 业务逻辑                                                           │   │
 │  │                                                                       │   │
@@ -57,7 +57,7 @@ Agentic RAG 系统采用**智能代理协作**模式：
 │  │  • Claude Code 能力                                                   │   │
 │  │  • LLM 接入                                                           │   │
 │  │  • Session/Message 管理                                               │   │
-│  │  • 对话过程中调用 PromptX 激活角色（助手/子代理）                     │   │
+│  │  • 对话过程中调用 PromptX 激活角色（领域角色/子代理）                 │   │
 │  │                                                                       │   │
 │  │  存储：unstorage (支持多后端)                                         │   │
 │  │                                                                       │   │
@@ -68,12 +68,12 @@ Agentic RAG 系统采用**智能代理协作**模式：
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                    PromptX (资源层)                                   │   │
 │  │                                                                       │   │
-│  │  • 角色资源 (助手 + 子代理都是 PromptX 角色)                          │   │
+│  │  • 角色资源 (领域角色 + 子代理都是 PromptX 角色)                      │   │
 │  │  • 工具资源 (Tool Definitions)                                        │   │
 │  │  • 记忆系统 (Engrams)                                                 │   │
 │  │                                                                       │   │
 │  │  对话过程中：                                                         │   │
-│  │  • promptx_action(role) - 激活助手或子代理角色                        │   │
+│  │  • promptx_action(role) - 激活领域角色或子代理角色                    │   │
 │  │  • promptx_recall(role, query) - 检索角色记忆                         │   │
 │  │  • promptx_remember(role, engrams) - 保存角色记忆                     │   │
 │  │                                                                       │   │
@@ -90,7 +90,7 @@ Agentic RAG 系统采用**智能代理协作**模式：
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 1.4 助手与子代理的运行机制
+### 1.4 领域角色与子代理的运行机制
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -105,9 +105,9 @@ Agentic RAG 系统采用**智能代理协作**模式：
 │  │      │                                                               │   │
 │  │      │ MCP: promptx_action({ role: 'legal-advisor' })               │   │
 │  │      ▼                                                               │   │
-│  │  PromptX 激活助手角色（主角色）                                       │   │
+│  │  PromptX 激活领域角色（主角色）                                       │   │
 │  │      │                                                               │   │
-│  │      │ 助手分析意图，决定需要检索文档                                │   │
+│  │      │ 领域角色分析意图，决定需要检索文档                            │   │
 │  │      │                                                               │   │
 │  │      │ MCP: promptx_action({ role: 'retriever' })                   │   │
 │  │      ▼                                                               │   │
@@ -117,9 +117,9 @@ Agentic RAG 系统采用**智能代理协作**模式：
 │  │      │                                                               │   │
 │  │      │ MCP: promptx_action({ role: 'legal-advisor' })               │   │
 │  │      ▼                                                               │   │
-│  │  PromptX 切回助手角色                                                 │   │
+│  │  PromptX 切回领域角色                                                 │   │
 │  │      │                                                               │   │
-│  │      │ 助手整合结果，生成回复                                        │   │
+│  │      │ 领域角色整合结果，生成回复                                    │   │
 │  │      │                                                               │   │
 │  │      │ MCP: promptx_remember({ role: 'legal-advisor', ... })        │   │
 │  │      ▼                                                               │   │
@@ -134,7 +134,7 @@ Agentic RAG 系统采用**智能代理协作**模式：
 ```
 
 **关键点**：
-- 助手和子代理在 PromptX 中都是"角色"（Role）
+- 领域角色和子代理在 PromptX 中都是"角色"（Role）
 - Agent 框架在对话过程中通过 MCP 调用 PromptX 来激活不同角色
 - 角色切换发生在对话过程中，由 Agent 框架协调
 - 每个角色都有自己的记忆，通过 PromptX 的 remember/recall 管理
@@ -146,7 +146,7 @@ Agentic RAG 系统采用**智能代理协作**模式：
 | 检索方式 | 向量相似度匹配 | 角色智能理解 + 向量检索 |
 | 分块策略 | 固定规则分块 | AI 角色语义分块 |
 | 上下文理解 | 关键词匹配 | 业务语义理解 |
-| 响应生成 | 单一 LLM 调用 | 助手-子代理协作生成 |
+| 响应生成 | 单一 LLM 调用 | 领域角色-子代理协作生成 |
 | 学习能力 | 无 | 通过 PromptX 记忆系统持续学习 |
 
 ---
@@ -161,7 +161,7 @@ Agentic RAG 系统采用**智能代理协作**模式：
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                         助手 (Assistant)                             │   │
+│  │                         领域角色 (Domain Role)                       │   │
 │  │                         = 主角色 (Main Role)                         │   │
 │  │                                                                       │   │
 │  │  职责：                                                               │   │
@@ -198,24 +198,24 @@ Agentic RAG 系统采用**智能代理协作**模式：
 
 | 术语 | 英文 | 说明 |
 |------|------|------|
-| 助手 | Assistant | 用户创建的专业领域 AI 助手，是主角色的业务层表现 |
-| 主角色 | Main Role | 面向用户的角色，负责协调和整合 |
+| 领域 | Domain | 用户创建的专业知识领域实体，是主角色的业务层表现 |
+| 领域角色 | Domain Role | 面向用户的角色，负责协调和整合 |
 | 子代理 | SubAgent | 执行具体任务的专业代理，利用 Claude Code 的 subagent 机制 |
-| 角色 | Role | PromptX 中的角色资源，主角色和子代理在 PromptX 中都是角色 |
+| 角色 | Role | PromptX 中的角色资源，领域角色和子代理在 PromptX 中都是角色 |
 
 ### 2.3 角色定义
 
-#### 2.3.1 助手 (Assistant) = 主角色
+#### 2.3.1 领域角色 (Domain Role) = 主角色
 
-助手是用户的直接对话对象，负责整体协调。
+领域角色是用户的直接对话对象，负责整体协调。
 
 ```typescript
-interface Assistant {
-  id: string;                      // 格式: asst_xxxxxxxx
+interface Domain {
+  id: string;                      // 格式: dom_xxxxxxxx
   userId: string;
-  name: string;                    // 如 "法律顾问"、"技术专家"
+  name: string;                    // 如 "法律知识库"、"技术知识库"
   description: string;
-  domain: string;                  // 专业领域
+  expertise: string;               // 专业领域
 
   // 核心能力
   capabilities: {
@@ -266,12 +266,12 @@ interface SubAgent {
 }
 ```
 
-### 2.4 助手与子代理的关系
+### 2.4 领域与子代理的关系
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              助手 (Assistant)                                │
-│                              "法律顾问"                                      │
+│                              领域 (Domain)                                   │
+│                              "法律知识库"                                    │
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                         主角色 (PromptX Role)                        │   │
@@ -439,7 +439,7 @@ interface SubAgent {
 │  │                         AgentX 应用层                                 │   │
 │  │                                                                       │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                   │   │
-│  │  │ Assistant   │  │ Document    │  │Conversation │                   │   │
+│  │  │ Domain      │  │ Document    │  │Conversation │                   │   │
 │  │  │ Service     │  │ Service     │  │ Service     │                   │   │
 │  │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘                   │   │
 │  │         │                │                │                           │   │
@@ -537,7 +537,7 @@ await mcpClient.call('promptx_remember', {
 │  │                                                                       │   │
 │  │  存储内容：                                                           │   │
 │  │  • 用户信息 (users)                                                   │   │
-│  │  • 助手配置 (assistants)                                              │   │
+│  │  • 领域配置 (domains)                                                 │   │
 │  │  • 文档元数据 (documents)                                             │   │
 │  │  • 对话记录 (conversations, messages)                                 │   │
 │  │  • 角色配置 (roles)                                                   │   │
@@ -563,7 +563,7 @@ await mcpClient.call('promptx_remember', {
 │  │  {                                                                    │   │
 │  │    chunkId: string,                                                   │   │
 │  │    documentId: string,                                                │   │
-│  │    assistantId: string,                                               │   │
+│  │    domainId: string,                                                  │   │
 │  │    content: string,           // 原始内容                             │   │
 │  │    summary: string,           // AI 生成的摘要                        │   │
 │  │    keywords: string[],        // 关键词                               │   │
@@ -588,10 +588,10 @@ await mcpClient.call('promptx_remember', {
 │  │  目录结构：                                                           │   │
 │  │  data/                                                                │   │
 │  │  ├── uploads/                 # 原始上传文件                          │   │
-│  │  │   └── {assistantId}/                                               │   │
+│  │  │   └── {domainId}/                                                  │   │
 │  │  │       └── {documentId}/                                            │   │
 │  │  └── processed/               # 处理后的文件                          │   │
-│  │      └── {assistantId}/                                               │   │
+│  │      └── {domainId}/                                                  │   │
 │  │          └── {documentId}/                                            │   │
 │  │                                                                       │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
@@ -648,7 +648,7 @@ interface DocumentChunk {
 
 ### 6.1 Phase 1: 基础 Agentic 能力 (MVP)
 
-- [ ] 助手（主角色）框架实现
+- [ ] 领域角色（主角色）框架实现
 - [ ] 文档处理子代理（基础版）
 - [ ] 检索子代理（基础版）
 - [ ] PromptX MCP 集成
@@ -679,7 +679,7 @@ interface DocumentChunk {
 | [ARCHITECTURE-DESIGN.md](./ARCHITECTURE-DESIGN.md) | 本文档补充其 Agentic 架构部分 |
 | [TECHNICAL-ARCHITECTURE.md](./TECHNICAL-ARCHITECTURE.md) | 本文档定义 PromptX/Agent 集成层 |
 | [SPEC-003 文档处理](../SPEC-003-DOCUMENT-PROCESSING.md) | 本文档定义 Agentic 处理流程 |
-| [SPEC-004 对话系统](../SPEC-004-CONVERSATION-SYSTEM.md) | 本文档定义助手/子代理协作 |
+| [SPEC-004 对话系统](../SPEC-004-CONVERSATION-SYSTEM.md) | 本文档定义领域角色/子代理协作 |
 | [SPEC-005 角色记忆](../SPEC-005-ROLE-MEMORY.md) | 本文档定义角色体系和记忆机制 |
 
 ---
@@ -690,3 +690,4 @@ interface DocumentChunk {
 |------|------|----------|
 | 1.0.0 | 2024-12-17 | 初始版本，定义 Agentic 多角色架构 |
 | 2.0.0 | 2024-12-17 | 更新术语：子角色→子代理，明确 PromptX/Agent 分工 |
+| 3.0.0 | 2024-12-19 | 术语重构：助手(Assistant) → 领域(Domain)，领域角色(Domain Role) |

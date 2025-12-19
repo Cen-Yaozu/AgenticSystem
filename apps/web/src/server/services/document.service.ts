@@ -11,14 +11,14 @@ import type {
 } from '@agentic-rag/shared';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AssistantNotFoundError } from '../errors/business.error';
+import { DomainNotFoundError } from '../errors/business.error';
 import { AppError } from '../middleware/error';
-import { assistantRepository } from '../repositories/assistant.repository';
 import {
   documentRepository,
   type CreateDocumentData,
   type FindDocumentsOptions,
 } from '../repositories/document.repository';
+import { domainRepository } from '../repositories/domain.repository';
 import { ids } from '../utils/id';
 import { logger } from '../utils/logger';
 import { processDocument as processDocumentAsync } from './document-processor.service';
@@ -119,10 +119,10 @@ function ensureDocumentsDir(): void {
 }
 
 /**
- * 获取助手的文档目录
+ * 获取领域的文档目录
  */
-function getAssistantDocumentsDir(assistantId: string): string {
-  const dir = path.join(DOCUMENTS_DIR, assistantId);
+function getDomainDocumentsDir(domainId: string): string {
+  const dir = path.join(DOCUMENTS_DIR, domainId);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -132,8 +132,8 @@ function getAssistantDocumentsDir(assistantId: string): string {
 /**
  * 生成文档存储路径
  */
-function generateDocumentPath(assistantId: string, documentId: string, fileType: FileType): string {
-  const dir = getAssistantDocumentsDir(assistantId);
+function generateDocumentPath(domainId: string, documentId: string, fileType: FileType): string {
+  const dir = getDomainDocumentsDir(domainId);
   const ext = FILE_TYPE_TO_EXT[fileType];
   return path.join(dir, `${documentId}${ext}`);
 }
@@ -171,7 +171,7 @@ export const documentService = {
    * 保存文件 + 创建记录 + 触发异步处理
    */
   async uploadDocument(
-    assistantId: string,
+    domainId: string,
     file: {
       buffer: Buffer;
       originalname: string;
@@ -179,10 +179,10 @@ export const documentService = {
       size: number;
     }
   ): Promise<Document> {
-    // 验证助手存在
-    const assistant = assistantRepository.findById(assistantId);
-    if (!assistant) {
-      throw new AssistantNotFoundError(assistantId);
+    // 验证领域存在
+    const domain = domainRepository.findById(domainId);
+    if (!domain) {
+      throw new DomainNotFoundError(domainId);
     }
 
     // 验证文件
@@ -194,7 +194,7 @@ export const documentService = {
 
     // 生成文档 ID 和路径
     const documentId = ids.document();
-    const filePath = generateDocumentPath(assistantId, documentId, fileType);
+    const filePath = generateDocumentPath(domainId, documentId, fileType);
 
     try {
       // 保存文件到磁盘
@@ -203,7 +203,7 @@ export const documentService = {
 
       // 创建数据库记录
       const input: CreateDocumentData = {
-        assistantId,
+        domainId,
         filename: file.originalname,
         fileType,
         fileSize: file.size,
@@ -248,28 +248,28 @@ export const documentService = {
    * 获取文档列表
    */
   listDocuments(
-    assistantId: string,
+    domainId: string,
     params: DocumentListParams
   ): { data: Document[]; total: number } {
-    // 验证助手存在
-    const assistant = assistantRepository.findById(assistantId);
-    if (!assistant) {
-      throw new AssistantNotFoundError(assistantId);
+    // 验证领域存在
+    const domain = domainRepository.findById(domainId);
+    if (!domain) {
+      throw new DomainNotFoundError(domainId);
     }
 
     const options: FindDocumentsOptions = {
-      assistantId,
+      domainId,
       ...params,
     };
 
-    return documentRepository.findByAssistantId(options);
+    return documentRepository.findByDomainId(options);
   },
 
   /**
    * 获取文档详情
    */
-  getDocument(assistantId: string, documentId: string): Document {
-    const document = documentRepository.findById(documentId, assistantId);
+  getDocument(domainId: string, documentId: string): Document {
+    const document = documentRepository.findById(documentId, domainId);
 
     if (!document) {
       throw new DocumentNotFoundError(documentId);
@@ -282,14 +282,14 @@ export const documentService = {
    * 删除文档
    * 删除文件 + 删除向量 + 删除记录
    */
-  async deleteDocument(assistantId: string, documentId: string): Promise<void> {
+  async deleteDocument(domainId: string, documentId: string): Promise<void> {
     // 获取文档信息
-    const document = this.getDocument(assistantId, documentId);
+    const document = this.getDocument(domainId, documentId);
 
     try {
       // 1. 删除向量数据
       try {
-        await qdrantService.deletePointsByDocument(assistantId, documentId);
+        await qdrantService.deletePointsByDocument(domainId, documentId);
         logger.info(`文档向量已删除: ${documentId}`);
       } catch (error) {
         // 向量删除失败不阻止后续操作
@@ -320,9 +320,9 @@ export const documentService = {
   /**
    * 重新处理文档
    */
-  async reprocessDocument(assistantId: string, documentId: string): Promise<Document> {
+  async reprocessDocument(domainId: string, documentId: string): Promise<Document> {
     // 获取文档信息
-    const document = this.getDocument(assistantId, documentId);
+    const document = this.getDocument(domainId, documentId);
 
     // 检查文档状态
     if (document.status === 'processing') {
@@ -343,16 +343,16 @@ export const documentService = {
     });
 
     // 返回更新后的文档
-    return this.getDocument(assistantId, documentId);
+    return this.getDocument(domainId, documentId);
   },
 
   /**
-   * 批量删除助手的所有文档
+   * 批量删除领域的所有文档
    */
-  async deleteAllDocuments(assistantId: string): Promise<number> {
+  async deleteAllDocuments(domainId: string): Promise<number> {
     // 获取所有文档
-    const result = documentRepository.findByAssistantId({
-      assistantId,
+    const result = documentRepository.findByDomainId({
+      domainId,
       page: 1,
       pageSize: 1000,
     });
@@ -361,7 +361,7 @@ export const documentService = {
 
     for (const document of result.data) {
       try {
-        await this.deleteDocument(assistantId, document.id);
+        await this.deleteDocument(domainId, document.id);
         deletedCount++;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -369,10 +369,10 @@ export const documentService = {
       }
     }
 
-    // 删除助手的文档目录
-    const assistantDir = path.join(DOCUMENTS_DIR, assistantId);
-    if (fs.existsSync(assistantDir)) {
-      fs.rmSync(assistantDir, { recursive: true, force: true });
+    // 删除领域的文档目录
+    const domainDir = path.join(DOCUMENTS_DIR, domainId);
+    if (fs.existsSync(domainDir)) {
+      fs.rmSync(domainDir, { recursive: true, force: true });
     }
 
     return deletedCount;
@@ -381,21 +381,21 @@ export const documentService = {
   /**
    * 获取文档统计信息
    */
-  getDocumentStats(assistantId: string): {
+  getDocumentStats(domainId: string): {
     total: number;
     byStatus: Record<DocumentStatus, number>;
     totalSize: number;
     totalChunks: number;
   } {
-    // 验证助手存在
-    const assistant = assistantRepository.findById(assistantId);
-    if (!assistant) {
-      throw new AssistantNotFoundError(assistantId);
+    // 验证领域存在
+    const domain = domainRepository.findById(domainId);
+    if (!domain) {
+      throw new DomainNotFoundError(domainId);
     }
 
     // 获取所有文档
-    const result = documentRepository.findByAssistantId({
-      assistantId,
+    const result = documentRepository.findByDomainId({
+      domainId,
       page: 1,
       pageSize: 10000,
     });
@@ -426,14 +426,14 @@ export const documentService = {
    * 下载文档
    */
   downloadDocument(
-    assistantId: string,
+    domainId: string,
     documentId: string
   ): {
     buffer: Buffer;
     filename: string;
     fileType: FileType;
   } {
-    const document = this.getDocument(assistantId, documentId);
+    const document = this.getDocument(domainId, documentId);
 
     if (!document.filePath || !fs.existsSync(document.filePath)) {
       throw new FileNotFoundError(documentId);

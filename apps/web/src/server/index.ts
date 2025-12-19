@@ -9,8 +9,8 @@ import { resolve } from 'path';
 import { initDatabase } from './database/index.js';
 import { errorHandler } from './middleware/error.js';
 import { requestLogger } from './middleware/logger.js';
-import assistantsRoutes from './routes/assistants.js';
 import documentsRoutes from './routes/documents.js';
+import domainsRoutes from './routes/domains.js';
 import { logger } from './utils/logger.js';
 
 // 加载环境变量（从项目根目录）
@@ -47,17 +47,24 @@ app.get('/api', (c) => {
     version: '0.1.0',
     endpoints: {
       health: '/health',
-      assistants: '/api/v1/assistants',
-      documents: '/api/v1/documents',
+      domains: '/api/v1/domains',
+      documents: '/api/v1/domains/:domainId/documents',
       conversations: '/api/v1/conversations',
+      // 向后兼容（将在未来版本移除）
+      assistants: '/api/v1/assistants (deprecated, use /api/v1/domains)',
     },
   });
 });
 
-// 挂载助手路由
-app.route('/api/v1/assistants', assistantsRoutes);
+// 挂载领域路由
+app.route('/api/v1/domains', domainsRoutes);
 
-// 挂载文档路由（嵌套在助手下）
+// 挂载文档路由（嵌套在领域下）
+app.route('/api/v1/domains/:domainId/documents', documentsRoutes);
+
+// 向后兼容：旧的 assistants 路由重定向到 domains
+// 这样旧的客户端仍然可以工作
+app.route('/api/v1/assistants', domainsRoutes);
 app.route('/api/v1/assistants/:assistantId/documents', documentsRoutes);
 
 // 404 处理

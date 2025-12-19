@@ -9,7 +9,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 // 测试常量
 const TEST_USER_ID = 'test-user-001';
-const TEST_ASSISTANT_ID = 'ast_test-assistant-001';
+const TEST_DOMAIN_ID = 'dom_test-domain-001';
 
 // 测试数据库实例
 let testDb: Database.Database;
@@ -35,13 +35,13 @@ function createTestSchema(db: Database.Database): void {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- 助手表
-    CREATE TABLE IF NOT EXISTS assistants (
+    -- 领域表（原助手表）
+    CREATE TABLE IF NOT EXISTS domains (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       description TEXT,
-      domain TEXT,
+      expertise TEXT,
       settings TEXT DEFAULT '{}',
       status TEXT DEFAULT 'initializing' CHECK (status IN ('initializing', 'ready', 'processing', 'error')),
       document_count INTEGER DEFAULT 0,
@@ -51,13 +51,13 @@ function createTestSchema(db: Database.Database): void {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE INDEX IF NOT EXISTS idx_assistants_user_id ON assistants(user_id);
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_assistants_user_name ON assistants(user_id, name);
+    CREATE INDEX IF NOT EXISTS idx_domains_user_id ON domains(user_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_domains_user_name ON domains(user_id, name);
 
     -- 文档表
     CREATE TABLE IF NOT EXISTS documents (
       id TEXT PRIMARY KEY,
-      assistant_id TEXT NOT NULL REFERENCES assistants(id) ON DELETE CASCADE,
+      domain_id TEXT NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
       filename TEXT NOT NULL,
       file_type TEXT NOT NULL,
       file_size INTEGER NOT NULL,
@@ -72,7 +72,7 @@ function createTestSchema(db: Database.Database): void {
       processed_at TEXT
     );
 
-    CREATE INDEX IF NOT EXISTS idx_documents_assistant_id ON documents(assistant_id);
+    CREATE INDEX IF NOT EXISTS idx_documents_domain_id ON documents(domain_id);
     CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
 
     -- 插入测试用户
@@ -86,13 +86,13 @@ function createTestSchema(db: Database.Database): void {
       CURRENT_TIMESTAMP
     );
 
-    -- 插入测试助手
-    INSERT INTO assistants (id, user_id, name, description, status, created_at, updated_at)
+    -- 插入测试领域
+    INSERT INTO domains (id, user_id, name, description, status, created_at, updated_at)
     VALUES (
-      '${TEST_ASSISTANT_ID}',
+      '${TEST_DOMAIN_ID}',
       '${TEST_USER_ID}',
-      'Test Assistant',
-      'A test assistant',
+      'Test Domain',
+      'A test domain',
       'ready',
       CURRENT_TIMESTAMP,
       CURRENT_TIMESTAMP
@@ -155,7 +155,7 @@ describe('Document Service', () => {
       const { documentRepository } = await import('../repositories/document.repository');
 
       const doc = documentRepository.create({
-        assistantId: TEST_ASSISTANT_ID,
+        domainId: TEST_DOMAIN_ID,
         filename: 'test.pdf',
         fileType: 'pdf',
         fileSize: 1024,
@@ -174,7 +174,7 @@ describe('Document Service', () => {
       const { documentRepository } = await import('../repositories/document.repository');
 
       const created = documentRepository.create({
-        assistantId: TEST_ASSISTANT_ID,
+        domainId: TEST_DOMAIN_ID,
         filename: 'find-test.pdf',
         fileType: 'pdf',
         fileSize: 2048,
@@ -188,12 +188,12 @@ describe('Document Service', () => {
       expect(found?.filename).toBe('find-test.pdf');
     });
 
-    it('should find documents by assistant id', async () => {
+    it('should find documents by domain id', async () => {
       const { documentRepository } = await import('../repositories/document.repository');
 
       // 创建多个文档
       documentRepository.create({
-        assistantId: TEST_ASSISTANT_ID,
+        domainId: TEST_DOMAIN_ID,
         filename: 'doc1.pdf',
         fileType: 'pdf',
         fileSize: 1000,
@@ -201,15 +201,15 @@ describe('Document Service', () => {
       });
 
       documentRepository.create({
-        assistantId: TEST_ASSISTANT_ID,
+        domainId: TEST_DOMAIN_ID,
         filename: 'doc2.docx',
         fileType: 'docx',
         fileSize: 2000,
         filePath: '/path/to/doc2.docx',
       });
 
-      const result = documentRepository.findByAssistantId({
-        assistantId: TEST_ASSISTANT_ID,
+      const result = documentRepository.findByDomainId({
+        domainId: TEST_DOMAIN_ID,
         page: 1,
         pageSize: 10,
       });
@@ -222,7 +222,7 @@ describe('Document Service', () => {
       const { documentRepository } = await import('../repositories/document.repository');
 
       const doc = documentRepository.create({
-        assistantId: TEST_ASSISTANT_ID,
+        domainId: TEST_DOMAIN_ID,
         filename: 'status-test.pdf',
         fileType: 'pdf',
         fileSize: 1024,
@@ -238,7 +238,7 @@ describe('Document Service', () => {
       const { documentRepository } = await import('../repositories/document.repository');
 
       const doc = documentRepository.create({
-        assistantId: TEST_ASSISTANT_ID,
+        domainId: TEST_DOMAIN_ID,
         filename: 'complete-test.pdf',
         fileType: 'pdf',
         fileSize: 1024,
@@ -257,7 +257,7 @@ describe('Document Service', () => {
       const { documentRepository } = await import('../repositories/document.repository');
 
       const doc = documentRepository.create({
-        assistantId: TEST_ASSISTANT_ID,
+        domainId: TEST_DOMAIN_ID,
         filename: 'fail-test.pdf',
         fileType: 'pdf',
         fileSize: 1024,
@@ -275,7 +275,7 @@ describe('Document Service', () => {
       const { documentRepository } = await import('../repositories/document.repository');
 
       const doc = documentRepository.create({
-        assistantId: TEST_ASSISTANT_ID,
+        domainId: TEST_DOMAIN_ID,
         filename: 'delete-test.pdf',
         fileType: 'pdf',
         fileSize: 1024,
@@ -294,7 +294,7 @@ describe('Document Service', () => {
 
       // 创建待处理文档
       documentRepository.create({
-        assistantId: TEST_ASSISTANT_ID,
+        domainId: TEST_DOMAIN_ID,
         filename: 'pending1.pdf',
         fileType: 'pdf',
         fileSize: 1024,
@@ -302,7 +302,7 @@ describe('Document Service', () => {
       });
 
       documentRepository.create({
-        assistantId: TEST_ASSISTANT_ID,
+        domainId: TEST_DOMAIN_ID,
         filename: 'pending2.pdf',
         fileType: 'pdf',
         fileSize: 1024,
@@ -319,8 +319,8 @@ describe('Document Service', () => {
       const { documentRepository } = await import('../repositories/document.repository');
 
       // 创建不同状态的文档
-      const doc1 = documentRepository.create({
-        assistantId: TEST_ASSISTANT_ID,
+      documentRepository.create({
+        domainId: TEST_DOMAIN_ID,
         filename: 'queued.pdf',
         fileType: 'pdf',
         fileSize: 1024,
@@ -328,7 +328,7 @@ describe('Document Service', () => {
       });
 
       const doc2 = documentRepository.create({
-        assistantId: TEST_ASSISTANT_ID,
+        domainId: TEST_DOMAIN_ID,
         filename: 'completed.pdf',
         fileType: 'pdf',
         fileSize: 1024,
@@ -338,8 +338,8 @@ describe('Document Service', () => {
       documentRepository.markAsCompleted(doc2.id, 5);
 
       // 查询已完成的文档
-      const result = documentRepository.findByAssistantId({
-        assistantId: TEST_ASSISTANT_ID,
+      const result = documentRepository.findByDomainId({
+        domainId: TEST_DOMAIN_ID,
         status: 'completed',
         page: 1,
         pageSize: 10,

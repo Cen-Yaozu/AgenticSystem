@@ -31,13 +31,13 @@ function createTestSchema(db: Database.Database): void {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- 助手表
-    CREATE TABLE IF NOT EXISTS assistants (
+    -- 领域表（原助手表）
+    CREATE TABLE IF NOT EXISTS domains (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       description TEXT,
-      domain TEXT,
+      expertise TEXT,
       settings TEXT DEFAULT '{}',
       status TEXT DEFAULT 'initializing' CHECK (status IN ('initializing', 'ready', 'processing', 'error')),
       document_count INTEGER DEFAULT 0,
@@ -47,8 +47,8 @@ function createTestSchema(db: Database.Database): void {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE INDEX IF NOT EXISTS idx_assistants_user_id ON assistants(user_id);
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_assistants_user_name ON assistants(user_id, name);
+    CREATE INDEX IF NOT EXISTS idx_domains_user_id ON domains(user_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_domains_user_name ON domains(user_id, name);
 
     -- 插入测试用户
     INSERT INTO users (id, name, email, status, created_at, updated_at)
@@ -136,8 +136,8 @@ describe('Assistants API', () => {
   });
 
   beforeEach(() => {
-    // 清空助手表数据
-    testDb.exec('DELETE FROM assistants');
+    // 清空领域表数据
+    testDb.exec('DELETE FROM domains');
   });
 
   const makeRequest = async (
@@ -163,14 +163,14 @@ describe('Assistants API', () => {
       const res = await makeRequest('POST', '/api/v1/assistants', {
         name: '测试助手',
         description: '测试描述',
-        domain: 'test',
+        expertise: 'test',
       });
 
       expect(res.status).toBe(201);
       const json = await res.json();
       expect(json.success).toBe(true);
       expect(json.data.name).toBe('测试助手');
-      expect(json.data.id).toMatch(/^ast_/);
+      expect(json.data.id).toMatch(/^dom_/);
       expect(json.data.workspacePath).toBeDefined();
     });
 
@@ -201,7 +201,7 @@ describe('Assistants API', () => {
       expect(res.status).toBe(409);
       const json = await res.json();
       expect(json.success).toBe(false);
-      expect(json.error.code).toBe('ASSISTANT_NAME_DUPLICATE');
+      expect(json.error.code).toBe('DOMAIN_NAME_DUPLICATE');
     });
 
     it('应该在未认证时返回 401', async () => {
@@ -218,9 +218,9 @@ describe('Assistants API', () => {
 
   describe('GET /api/v1/assistants', () => {
     beforeEach(async () => {
-      await makeRequest('POST', '/api/v1/assistants', { name: '助手A', domain: 'legal' });
-      await makeRequest('POST', '/api/v1/assistants', { name: '助手B', domain: 'medical' });
-      await makeRequest('POST', '/api/v1/assistants', { name: '助手C', domain: 'legal' });
+      await makeRequest('POST', '/api/v1/assistants', { name: '助手A', expertise: 'legal' });
+      await makeRequest('POST', '/api/v1/assistants', { name: '助手B', expertise: 'medical' });
+      await makeRequest('POST', '/api/v1/assistants', { name: '助手C', expertise: 'legal' });
     });
 
     it('应该返回助手列表', async () => {
@@ -243,8 +243,8 @@ describe('Assistants API', () => {
       expect(json.meta.pageSize).toBe(2);
     });
 
-    it('应该支持按 domain 筛选', async () => {
-      const res = await makeRequest('GET', '/api/v1/assistants?domain=legal');
+    it('应该支持按 expertise 筛选', async () => {
+      const res = await makeRequest('GET', '/api/v1/assistants?expertise=legal');
 
       expect(res.status).toBe(200);
       const json = await res.json();
@@ -271,7 +271,7 @@ describe('Assistants API', () => {
       expect(res.status).toBe(404);
       const json = await res.json();
       expect(json.success).toBe(false);
-      expect(json.error.code).toBe('ASSISTANT_NOT_FOUND');
+      expect(json.error.code).toBe('DOMAIN_NOT_FOUND');
     });
   });
 
@@ -329,13 +329,13 @@ describe('Assistants API', () => {
       const created = await createRes.json();
 
       // 手动更新状态
-      testDb.prepare('UPDATE assistants SET status = ? WHERE id = ?').run('processing', created.data.id);
+      testDb.prepare('UPDATE domains SET status = ? WHERE id = ?').run('processing', created.data.id);
 
       const res = await makeRequest('DELETE', `/api/v1/assistants/${created.data.id}`);
 
       expect(res.status).toBe(409);
       const json = await res.json();
-      expect(json.error.code).toBe('ASSISTANT_CANNOT_DELETE');
+      expect(json.error.code).toBe('DOMAIN_CANNOT_DELETE');
     });
   });
 });

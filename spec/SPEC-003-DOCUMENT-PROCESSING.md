@@ -1,6 +1,6 @@
 # SPEC-003: 文档处理
 
-> 版本: 5.0 | 状态: Draft | 日期: 2024-12-17
+> 版本: 6.0 | 状态: Draft | 日期: 2024-12-19
 
 ## 1. 概述
 
@@ -17,12 +17,12 @@
 
 **相关文档**：
 - [SPEC-001 系统概述](./SPEC-001-SYSTEM-OVERVIEW.md)
-- [SPEC-002 助手管理](./SPEC-002-ASSISTANT-MANAGEMENT.md)
+- [SPEC-002 领域管理](./SPEC-002-DOMAIN-MANAGEMENT.md)
 - [数据模型设计](./design/DATA-MODEL.md)
 
 ## 2. 用户故事
 
-作为用户，我希望上传专业文档给助手学习，以便助手能够基于这些文档提供专业回答。
+作为用户，我希望上传专业文档给领域学习，以便领域能够基于这些文档提供专业回答。
 
 **核心场景**：
 1. 上传 PDF/Word/TXT 等格式文档
@@ -50,7 +50,7 @@
 |------|------|
 | BR-001 | 单个文档大小不能超过 10MB |
 | BR-002 | 只支持指定的文档格式 |
-| BR-003 | 每个助手最多存储 100 个文档（MVP 限制） |
+| BR-003 | 每个领域最多存储 100 个文档（MVP 限制） |
 | BR-004 | 处理失败的文档可以重试，最多 3 次 |
 | BR-005 | 删除文档时必须同时删除向量数据 |
 | BR-006 | 文档处理是异步的，不阻塞用户操作 |
@@ -215,7 +215,7 @@ const vector = response.data[0].embedding;
 │                                                                             │
 │  7. 索引存储                                                                │
 │     • 存储到 Qdrant                                                        │
-│     • 使用助手 ID 作为 collection 名称                                      │
+│     • 使用领域 ID 作为 collection 名称                                      │
 │     • 更新状态（status: completed）                                         │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -225,11 +225,11 @@ const vector = response.data[0].embedding;
 
 ### 7.1 Qdrant Collection 设计
 
-每个助手对应一个 Qdrant collection：
+每个领域对应一个 Qdrant collection：
 
 ```typescript
-// Collection 命名：assistant_{assistantId}
-const collectionName = `assistant_${assistantId}`;
+// Collection 命名：domain_{domainId}
+const collectionName = `domain_${domainId}`;
 
 // 向量配置
 const vectorConfig = {
@@ -274,7 +274,7 @@ await qdrantClient.delete(collectionName, {
 ```typescript
 interface Document {
   id: string;                    // 格式: doc_xxxxxxxx
-  assistantId: string;
+  domainId: string;
   filename: string;
   fileType: 'pdf' | 'docx' | 'txt' | 'md' | 'xlsx';
   fileSize: number;              // 字节
@@ -358,3 +358,4 @@ interface Document {
 | 3.1 | 2024-12-17 | 更新术语：子角色→子代理，添加多实例架构说明 |
 | 4.0 | 2024-12-17 | 简化为 PromptX 工具集成，移除复杂的子代理架构 |
 | 5.0 | 2024-12-17 | 改为复用 collector 解析器，更简单高效 |
+| 6.0 | 2024-12-19 | 术语重构：助手(Assistant) → 领域(Domain) |

@@ -2,7 +2,7 @@ import { nanoid } from 'nanoid';
 
 /**
  * 生成带前缀的唯一 ID
- * @param prefix - ID 前缀，如 'ast', 'doc', 'conv', 'msg'
+ * @param prefix - ID 前缀，如 'dom', 'doc', 'conv', 'msg'
  * @param length - ID 长度（不含前缀），默认 12
  */
 export function generateId(prefix: string, length = 12): string {
@@ -14,11 +14,15 @@ export function generateId(prefix: string, length = 12): string {
  */
 export const ids = {
   user: () => generateId('usr'),
-  assistant: () => generateId('ast'),
+  domain: () => generateId('dom'),
   document: () => generateId('doc'),
   conversation: () => generateId('conv'),
   message: () => generateId('msg'),
   role: () => generateId('role'),
   memory: () => generateId('mem'),
   chunk: () => generateId('chk'),
+
+  // 向后兼容别名（将在未来版本移除）
+  /** @deprecated 使用 domain() 代替 */
+  assistant: () => generateId('dom'),
 };

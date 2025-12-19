@@ -15,7 +15,9 @@ const WORKSPACES_ROOT = process.env.WORKSPACES_ROOT || join(__dirname, '../../..
  * 工作区接口
  */
 export interface Workspace {
-  assistantId: string;
+  domainId: string;
+  /** @deprecated Use domainId instead */
+  assistantId?: string;
   path: string;
   promptxResourcePath: string;
   mcpConfigPath: string;
@@ -39,7 +41,7 @@ interface McpConfig {
 
 /**
  * 工作区服务类
- * 管理助手的工作区目录
+ * 管理领域的工作区目录
  */
 export class WorkspaceService {
   private workspacesRoot: string;
@@ -51,17 +53,19 @@ export class WorkspaceService {
   /**
    * 获取工作区路径
    */
-  getWorkspacePath(assistantId: string): string {
-    return join(this.workspacesRoot, assistantId);
+  getWorkspacePath(domainId: string): string {
+    return join(this.workspacesRoot, domainId);
   }
 
   /**
    * 获取工作区详情
    */
-  getWorkspace(assistantId: string): Workspace {
-    const basePath = this.getWorkspacePath(assistantId);
+  getWorkspace(domainId: string): Workspace {
+    const basePath = this.getWorkspacePath(domainId);
     return {
-      assistantId,
+      domainId,
+      // 向后兼容
+      assistantId: domainId,
       path: basePath,
       promptxResourcePath: join(basePath, '.promptx', 'resource'),
       mcpConfigPath: join(basePath, 'mcp.json'),
@@ -73,15 +77,15 @@ export class WorkspaceService {
    * 创建工作区目录结构
    *
    * 目录结构：
-   * workspaces/{assistantId}/
+   * workspaces/{domainId}/
    * ├── .promptx/
    * │   └── resource/
    * │       └── role/
    * ├── mcp.json
    * └── documents/
    */
-  async createWorkspace(assistantId: string): Promise<Workspace> {
-    const workspace = this.getWorkspace(assistantId);
+  async createWorkspace(domainId: string): Promise<Workspace> {
+    const workspace = this.getWorkspace(domainId);
 
     try {
       // 确保工作区根目录存在
@@ -112,11 +116,11 @@ export class WorkspaceService {
       // 生成 MCP 配置文件
       this.generateMcpConfig(workspace);
 
-      logger.info(`Workspace created successfully for assistant: ${assistantId}`);
+      logger.info(`Workspace created successfully for domain: ${domainId}`);
       return workspace;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error({ err: error, assistantId }, `Failed to create workspace for assistant ${assistantId}: ${errorMessage}`);
+      logger.error({ err: error, domainId }, `Failed to create workspace for domain ${domainId}: ${errorMessage}`);
       // 尝试清理已创建的目录
       this.cleanupWorkspace(workspace.path);
       throw new Error(`Failed to create workspace: ${errorMessage}`);
@@ -126,8 +130,8 @@ export class WorkspaceService {
   /**
    * 删除工作区目录
    */
-  async deleteWorkspace(assistantId: string): Promise<void> {
-    const workspacePath = this.getWorkspacePath(assistantId);
+  async deleteWorkspace(domainId: string): Promise<void> {
+    const workspacePath = this.getWorkspacePath(domainId);
 
     try {
       if (existsSync(workspacePath)) {
@@ -138,7 +142,7 @@ export class WorkspaceService {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error({ err: error, assistantId }, `Failed to delete workspace for assistant ${assistantId}: ${errorMessage}`);
+      logger.error({ err: error, domainId }, `Failed to delete workspace for domain ${domainId}: ${errorMessage}`);
       throw new Error(`Failed to delete workspace: ${errorMessage}`);
     }
   }
@@ -146,8 +150,8 @@ export class WorkspaceService {
   /**
    * 检查工作区是否存在
    */
-  workspaceExists(assistantId: string): boolean {
-    return existsSync(this.getWorkspacePath(assistantId));
+  workspaceExists(domainId: string): boolean {
+    return existsSync(this.getWorkspacePath(domainId));
   }
 
   /**

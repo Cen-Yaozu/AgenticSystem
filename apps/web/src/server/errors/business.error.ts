@@ -1,89 +1,114 @@
 import { ERROR_CODES } from '@agentic-rag/shared';
 import { AppError } from '../middleware/error.js';
 
+// ============================================
+// 领域相关错误
+// ============================================
+
 /**
- * 助手不存在错误
+ * 领域不存在错误
  */
-export class AssistantNotFoundError extends AppError {
-  constructor(assistantId?: string) {
+export class DomainNotFoundError extends AppError {
+  constructor(domainId?: string) {
     super(
-      ERROR_CODES.ASSISTANT_NOT_FOUND,
-      assistantId ? `Assistant ${assistantId} not found` : 'Assistant not found',
+      ERROR_CODES.DOMAIN_NOT_FOUND,
+      domainId ? `Domain ${domainId} not found` : 'Domain not found',
       404
     );
-    this.name = 'AssistantNotFoundError';
+    this.name = 'DomainNotFoundError';
   }
 }
 
 /**
- * 助手名称必填错误
+ * 领域名称必填错误
  */
-export class AssistantNameRequiredError extends AppError {
+export class DomainNameRequiredError extends AppError {
   constructor() {
     super(
-      ERROR_CODES.ASSISTANT_NAME_REQUIRED,
-      'Assistant name is required',
+      ERROR_CODES.DOMAIN_NAME_REQUIRED,
+      'Domain name is required',
       400
     );
-    this.name = 'AssistantNameRequiredError';
+    this.name = 'DomainNameRequiredError';
   }
 }
 
 /**
- * 助手名称过长错误
+ * 领域名称过长错误
  */
-export class AssistantNameTooLongError extends AppError {
+export class DomainNameTooLongError extends AppError {
   constructor(maxLength: number) {
     super(
-      ERROR_CODES.ASSISTANT_NAME_TOO_LONG,
-      `Assistant name must not exceed ${maxLength} characters`,
+      ERROR_CODES.DOMAIN_NAME_TOO_LONG,
+      `Domain name must not exceed ${maxLength} characters`,
       400
     );
-    this.name = 'AssistantNameTooLongError';
+    this.name = 'DomainNameTooLongError';
   }
 }
 
 /**
- * 助手名称重复错误
+ * 领域名称重复错误
  */
-export class AssistantNameDuplicateError extends AppError {
+export class DomainNameDuplicateError extends AppError {
   constructor(name: string) {
     super(
-      ERROR_CODES.ASSISTANT_NAME_DUPLICATE,
-      `Assistant with name "${name}" already exists`,
+      ERROR_CODES.DOMAIN_NAME_DUPLICATE,
+      `Domain with name "${name}" already exists`,
       409
     );
-    this.name = 'AssistantNameDuplicateError';
+    this.name = 'DomainNameDuplicateError';
   }
 }
 
 /**
- * 助手数量超限错误
+ * 领域数量超限错误
  */
-export class AssistantLimitExceededError extends AppError {
+export class DomainLimitExceededError extends AppError {
   constructor(limit: number) {
     super(
-      ERROR_CODES.ASSISTANT_LIMIT_EXCEEDED,
-      `Maximum number of assistants (${limit}) exceeded`,
+      ERROR_CODES.DOMAIN_LIMIT_EXCEEDED,
+      `Maximum number of domains (${limit}) exceeded`,
       403
     );
-    this.name = 'AssistantLimitExceededError';
+    this.name = 'DomainLimitExceededError';
   }
 }
 
 /**
- * 助手无法删除错误（正在处理中）
+ * 领域无法删除错误（正在处理中）
  */
-export class AssistantCannotDeleteError extends AppError {
-  constructor(reason: string = 'Assistant is currently processing') {
+export class DomainCannotDeleteError extends AppError {
+  constructor(reason: string = 'Domain is currently processing') {
     super(
-      ERROR_CODES.ASSISTANT_CANNOT_DELETE,
+      ERROR_CODES.DOMAIN_CANNOT_DELETE,
       reason,
       409
     );
-    this.name = 'AssistantCannotDeleteError';
+    this.name = 'DomainCannotDeleteError';
   }
 }
+
+// ============================================
+// 向后兼容别名（将在未来版本移除）
+// ============================================
+
+/** @deprecated 使用 DomainNotFoundError 代替 */
+export const AssistantNotFoundError = DomainNotFoundError;
+/** @deprecated 使用 DomainNameRequiredError 代替 */
+export const AssistantNameRequiredError = DomainNameRequiredError;
+/** @deprecated 使用 DomainNameTooLongError 代替 */
+export const AssistantNameTooLongError = DomainNameTooLongError;
+/** @deprecated 使用 DomainNameDuplicateError 代替 */
+export const AssistantNameDuplicateError = DomainNameDuplicateError;
+/** @deprecated 使用 DomainLimitExceededError 代替 */
+export const AssistantLimitExceededError = DomainLimitExceededError;
+/** @deprecated 使用 DomainCannotDeleteError 代替 */
+export const AssistantCannotDeleteError = DomainCannotDeleteError;
+
+// ============================================
+// 通用错误
+// ============================================
 
 /**
  * 未授权错误
