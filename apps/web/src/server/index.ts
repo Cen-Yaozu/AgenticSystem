@@ -1,5 +1,6 @@
 import { serve } from '@hono/node-server';
 import { config } from 'dotenv';
+import { createServer } from 'http';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger as honoLogger } from 'hono/logger';
@@ -9,8 +10,10 @@ import { resolve } from 'path';
 import { initDatabase } from './database/index.js';
 import { errorHandler } from './middleware/error.js';
 import { requestLogger } from './middleware/logger.js';
+import conversationsRoutes from './routes/conversations.js';
 import documentsRoutes from './routes/documents.js';
 import domainsRoutes from './routes/domains.js';
+import { initAgentX } from './services/agentx.service.js';
 import { logger } from './utils/logger.js';
 
 // 加载环境变量（从项目根目录）
@@ -62,6 +65,9 @@ app.route('/api/v1/domains', domainsRoutes);
 // 挂载文档路由（嵌套在领域下）
 app.route('/api/v1/domains/:domainId/documents', documentsRoutes);
 
+// 挂载对话路由
+app.route('/api/v1', conversationsRoutes);
+
 // 向后兼容：旧的 assistants 路由重定向到 domains
 // 这样旧的客户端仍然可以工作
 app.route('/api/v1/assistants', domainsRoutes);
@@ -89,16 +95,62 @@ async function main() {
     await initDatabase();
     logger.info('Database initialized successfully');
 
+    // 创建 HTTP Server（AgentX 需要）
+    const server = createServer((req, res) => {
+      // 将请求转发给 Hono
+      const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
+      app.fetch(
+        new Request(`http://${req.headers.host || `${host}:${port}`}${req.url}`, {
+          method: req.method || 'GET',
+          headers: req.headers as HeadersInit,
+          body: hasBody ? req : undefined,
+          // Node.js 22+ 要求在有 body 时设置 duplex
+          ...(hasBody && { duplex: 'half' }),
+        } as RequestInit)
+      ).then(async (honoRes) => {
+        // 将 Hono 响应转发回客户端
+        res.writeHead(honoRes.status, Object.fromEntries(honoRes.headers.entries()));
+        if (honoRes.body) {
+          const reader = honoRes.body.getReader();
+          const pump = async (): Promise<void> => {
+            const { done, value } = await reader.read();
+            if (done) {
+              res.end();
+              return;
+            }
+            res.write(value);
+            return pump();
+          };
+          await pump();
+        } else {
+          res.end();
+        }
+      }).catch((error) => {
+        logger.error({ err: error }, 'Error handling request');
+        res.writeHead(500);
+        res.end('Internal Server Error');
+      });
+    });
+
+    // 初始化 AgentX
+    logger.info('Initializing AgentX...');
+    await initAgentX({
+      llm: {
+        apiKey: process.env.ANTHROPIC_API_KEY!,
+        baseUrl: process.env.ANTHROPIC_BASE_URL,
+        model: process.env.ANTHROPIC_MODEL,
+      },
+      agentxDir: resolve(process.cwd(), '../../data/agentx'),
+      server,
+    });
+    logger.info('AgentX initialized successfully');
+
     // 启动服务器
     logger.info(`Starting server on http://${host}:${port}`);
-
-    serve({
-      fetch: app.fetch,
-      port,
-      hostname: host,
-    }, (info) => {
-      logger.info(`🚀 Server is running on http://${info.address}:${info.port}`);
-      logger.info(`📋 Health check: http://${info.address}:${info.port}/health`);
+    server.listen(port, host, () => {
+      logger.info(`🚀 Server is running on http://${host}:${port}`);
+      logger.info(`📋 Health check: http://${host}:${port}/health`);
+      logger.info(`🔌 AgentX WebSocket: ws://${host}:${port}/ws`);
     });
   } catch (error) {
     logger.error({ err: error }, 'Failed to start server');

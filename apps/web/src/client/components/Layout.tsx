@@ -1,4 +1,4 @@
-import { Outlet, Link } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 
 function Layout() {
   return (
@@ -21,10 +21,10 @@ function Layout() {
                 首页
               </Link>
               <Link
-                to="/assistants"
+                to="/domains"
                 className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >
-                助手
+                领域
               </Link>
             </nav>
           </div>

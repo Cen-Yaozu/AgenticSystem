@@ -19,9 +19,16 @@
   },
   "dependencies": {
     "@agentic-rag/shared": "workspace:*",
+    "@agentxjs/agent": "^1.4.0",
+    "@agentxjs/runtime": "^1.4.0",
+    "@agentxjs/types": "^1.4.0",
+    "@anthropic-ai/sdk": "^0.39.0",
     "@hono/node-server": "^1.13.7",
     "@hono/zod-validator": "^0.4.2",
+    "@modelcontextprotocol/sdk": "^1.0.0",
     "@qdrant/js-client-rest": "^1.16.2",
+    "@tanstack/react-query": "^5.90.15",
+    "agentxjs": "^1.4.0",
     "better-sqlite3": "^11.6.0",
     "dotenv": "^16.4.7",
     "hono": "^4.6.14",
@@ -32,6 +39,7 @@
     "pdf-parse": "^2.4.5",
     "pino": "^9.5.0",
     "pino-pretty": "^13.0.0",
+    "ws": "^8.18.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

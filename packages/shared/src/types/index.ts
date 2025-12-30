@@ -30,6 +30,25 @@ export interface User {
 // 领域相关类型
 // ============================================
 
+/**
+ * MCP Server 配置
+ */
+export interface MCPServerConfig {
+  /** 启动命令，如 "npx", "node" */
+  command: string;
+  /** 命令参数 */
+  args?: string[];
+  /** 环境变量 */
+  env?: Record<string, string>;
+  /** 是否启用，默认 true */
+  enabled?: boolean;
+}
+
+/**
+ * MCP Servers 配置（键值对）
+ */
+export type MCPServersConfig = Record<string, MCPServerConfig>;
+
 export interface DomainSettings {
   responseStyle: 'detailed' | 'concise';
   tone: 'formal' | 'friendly';
@@ -38,6 +57,14 @@ export interface DomainSettings {
   temperature: number;
   retrievalTopK: number;
   retrievalThreshold: number;
+
+  // 🆕 角色驱动配置
+  /** 主角色 ID（对话开始时激活） */
+  primaryRoleId?: string;
+  /** 子代理 ID 列表（在 systemPrompt 中定义委派规则） */
+  subRoleIds?: string[];
+  /** MCP Servers 配置（用户自定义） */
+  mcpServers?: MCPServersConfig;
 }
 
 export type DomainStatus = 'initializing' | 'ready' | 'processing' | 'error';
@@ -210,11 +237,11 @@ export interface Message {
 export interface Conversation {
   id: ID;
   domainId: ID;
-  title: string;
+  sessionId: string;
+  title: string | null;
   status: 'active' | 'archived';
-  messageCount: number;
-  startedAt: Timestamp;
-  lastMessageAt?: Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
 export interface CreateConversationInput {

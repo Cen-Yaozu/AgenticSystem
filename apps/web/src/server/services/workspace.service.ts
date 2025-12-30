@@ -84,7 +84,10 @@ export class WorkspaceService {
    * ├── mcp.json
    * └── documents/
    */
-  async createWorkspace(domainId: string): Promise<Workspace> {
+  async createWorkspace(
+    domainId: string,
+    settings?: { retrievalTopK?: number; retrievalThreshold?: number }
+  ): Promise<Workspace> {
     const workspace = this.getWorkspace(domainId);
 
     try {
@@ -114,7 +117,7 @@ export class WorkspaceService {
       }
 
       // 生成 MCP 配置文件
-      this.generateMcpConfig(workspace);
+      this.generateMcpConfig(workspace, domainId, settings);
 
       logger.info(`Workspace created successfully for domain: ${domainId}`);
       return workspace;
@@ -157,7 +160,14 @@ export class WorkspaceService {
   /**
    * 生成 MCP 配置文件
    */
-  private generateMcpConfig(workspace: Workspace): void {
+  private generateMcpConfig(
+    workspace: Workspace,
+    domainId: string,
+    settings?: { retrievalTopK?: number; retrievalThreshold?: number }
+  ): void {
+    const projectRoot = resolve(__dirname, '../../../../../');
+    const retrieverPath = resolve(projectRoot, 'mcp-servers/retriever.js');
+
     const config: McpConfig = {
       mcpServers: {
         promptx: {
@@ -165,6 +175,20 @@ export class WorkspaceService {
           args: ['-y', 'promptx-mcp'],
           env: {
             WORKSPACE_DIR: resolve(workspace.path),
+          },
+        },
+        retriever: {
+          command: 'node',
+          args: [retrieverPath],
+          env: {
+            DOMAIN_ID: domainId,
+            QDRANT_URL: process.env.QDRANT_URL || 'http://localhost:6333',
+            QDRANT_API_KEY: process.env.QDRANT_API_KEY || '',
+            QDRANT_COLLECTION: process.env.QDRANT_COLLECTION_NAME || 'agentic_rag_documents',
+            RETRIEVAL_TOP_K: String(settings?.retrievalTopK || 5),
+            RETRIEVAL_THRESHOLD: String(settings?.retrievalThreshold || 0.7),
+            OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+            EMBEDDING_MODEL: process.env.DEFAULT_EMBEDDING_MODEL || 'text-embedding-3-small',
           },
         },
       },

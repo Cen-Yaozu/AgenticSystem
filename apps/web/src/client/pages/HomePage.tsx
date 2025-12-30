@@ -49,10 +49,10 @@ function HomePage() {
       {/* CTA */}
       <div className="text-center py-8">
         <Link
-          to="/assistants/new"
+          to="/domains"
           className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
         >
-          创建你的第一个助手
+          开始使用
           <span className="ml-2">→</span>
         </Link>
       </div>

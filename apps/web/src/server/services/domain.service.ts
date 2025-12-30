@@ -17,6 +17,8 @@ import {
   type FindDomainsOptions
 } from '../repositories/domain.repository.js';
 import { logger } from '../utils/logger.js';
+import { registerDomainDefinition, unregisterDomainDefinition } from './agentx.service.js';
+import { roleService } from './role.service.js';
 import { workspaceService } from './workspace.service.js';
 
 /**
@@ -54,7 +56,10 @@ export class DomainService {
 
     // 创建工作区目录
     try {
-      const workspace = await workspaceService.createWorkspace(domain.id);
+      const workspace = await workspaceService.createWorkspace(domain.id, {
+        retrievalTopK: domain.settings.retrievalTopK,
+        retrievalThreshold: domain.settings.retrievalThreshold,
+      });
       // 更新领域的工作区路径
       domainRepository.update(domain.id, {
         workspacePath: workspace.path,
@@ -67,13 +72,59 @@ export class DomainService {
       throw error;
     }
 
+    // 重新获取领域信息（包含 workspacePath）
+    let updatedDomain = domainRepository.findById(domain.id)!;
+
+    // 创建默认角色定义文件（如果没有指定 primaryRoleId）
+    if (updatedDomain.workspacePath) {
+      try {
+        // 生成默认角色 ID
+        const defaultRoleId = input.settings?.primaryRoleId || roleService.generateDefaultRoleId(domain.id);
+
+        // 创建角色定义文件
+        await roleService.createRoleDefinition(updatedDomain.workspacePath, {
+          id: defaultRoleId,
+          name: input.name,
+          description: input.description,
+          expertise: input.expertise,
+          responseStyle: input.settings?.responseStyle || 'detailed',
+          tone: input.settings?.tone || 'friendly',
+          language: input.settings?.language || 'zh-CN',
+          subRoleIds: input.settings?.subRoleIds,
+        });
+
+        // 如果没有指定 primaryRoleId，更新领域设置
+        if (!input.settings?.primaryRoleId) {
+          const updatedSettings = {
+            ...updatedDomain.settings,
+            primaryRoleId: defaultRoleId,
+          };
+          domainRepository.update(domain.id, { settings: updatedSettings });
+          updatedDomain = domainRepository.findById(domain.id)!;
+        }
+
+        logger.info({ domainId: domain.id, roleId: defaultRoleId }, 'Role definition created for domain');
+      } catch (error) {
+        // 角色创建失败，记录日志但不回滚（可以后续重试）
+        logger.error({ err: error, domainId: domain.id }, 'Failed to create role definition');
+      }
+    }
+
+    // 注册 AgentX Definition
+    try {
+      await registerDomainDefinition(updatedDomain);
+      logger.info({ domainId: domain.id }, 'AgentX Definition registered for domain');
+    } catch (error) {
+      // Definition 注册失败，记录日志但不回滚（可以后续重试）
+      logger.error({ err: error, domainId: domain.id }, 'Failed to register AgentX Definition');
+    }
+
     // 异步标记为 ready（MVP 阶段直接标记，生产环境应在初始化完成后标记）
     setTimeout(() => {
       domainRepository.markAsReady(domain.id);
     }, 100);
 
-    // 重新获取领域信息（包含 workspacePath）
-    return domainRepository.findById(domain.id)!;
+    return updatedDomain;
   }
 
   /**
@@ -166,7 +217,16 @@ export class DomainService {
       throw new DomainCannotDeleteError('Cannot delete domain while it is processing');
     }
 
-    // 先删除工作区目录
+    // 注销 AgentX Definition
+    try {
+      unregisterDomainDefinition(domainId);
+      logger.info({ domainId }, 'AgentX Definition unregistered for domain');
+    } catch (error) {
+      // Definition 注销失败，记录日志但继续删除
+      logger.error({ err: error, domainId }, 'Failed to unregister AgentX Definition');
+    }
+
+    // 删除工作区目录
     try {
       await workspaceService.deleteWorkspace(domainId);
       logger.info({ domainId }, 'Workspace deleted for domain');

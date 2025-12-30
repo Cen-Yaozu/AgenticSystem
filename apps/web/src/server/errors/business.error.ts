@@ -90,6 +90,24 @@ export class DomainCannotDeleteError extends AppError {
 }
 
 // ============================================
+// 对话相关错误
+// ============================================
+
+/**
+ * 对话不存在错误
+ */
+export class ConversationNotFoundError extends AppError {
+  constructor(conversationId?: string) {
+    super(
+      'CONVERSATION_NOT_FOUND',
+      conversationId ? `Conversation ${conversationId} not found` : 'Conversation not found',
+      404
+    );
+    this.name = 'ConversationNotFoundError';
+  }
+}
+
+// ============================================
 // 向后兼容别名（将在未来版本移除）
 // ============================================
 

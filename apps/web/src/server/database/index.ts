@@ -91,6 +91,7 @@ async function runMigrations(): Promise<void> {
     { name: '003_add_workspace_path', sql: getWorkspacePathMigration() },
     { name: '004_add_document_fields', sql: getDocumentFieldsMigration() },
     { name: '005_rename_assistant_to_domain', sql: getRenameAssistantToDomainMigration() },
+    { name: '006_conversation_agentx_integration', sql: getConversationAgentXIntegrationMigration() },
   ];
 
   // 应用未执行的迁移
@@ -323,6 +324,88 @@ function getRenameAssistantToDomainMigration(): string {
     -- 5. 更新 roles 表的外键列名
     ALTER TABLE roles ADD COLUMN domain_id TEXT;
     UPDATE roles SET domain_id = assistant_id WHERE domain_id IS NULL;
+  `;
+}
+
+/**
+ * Conversation AgentX 集成迁移
+ * 简化 conversations 表，添加 session_id 字段
+ * 删除 messages 表（由 AgentX 管理）
+ */
+function getConversationAgentXIntegrationMigration(): string {
+  return `
+    -- 1. 修复 domains 表（确保有主键）
+    DROP TABLE IF EXISTS domains_fixed;
+    CREATE TABLE domains_fixed (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      description TEXT,
+      expertise TEXT,
+      settings TEXT DEFAULT '{}',
+      status TEXT DEFAULT 'initializing' CHECK (status IN ('initializing', 'ready', 'processing', 'error')),
+      document_count INTEGER DEFAULT 0,
+      conversation_count INTEGER DEFAULT 0,
+      workspace_path TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- 复制 domains 数据
+    INSERT INTO domains_fixed SELECT * FROM domains;
+
+    -- 删除旧表并重命名
+    DROP TABLE domains;
+    ALTER TABLE domains_fixed RENAME TO domains;
+
+    -- 重建索引
+    CREATE INDEX idx_domains_user_id ON domains(user_id);
+    CREATE UNIQUE INDEX idx_domains_user_name ON domains(user_id, name);
+
+    -- 2. 清理可能存在的临时表
+    DROP TABLE IF EXISTS conversations_new;
+
+    -- 3. 创建新的 conversations 表结构
+    CREATE TABLE conversations_new (
+      id TEXT PRIMARY KEY,
+      domain_id TEXT NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
+      session_id TEXT NOT NULL,
+      title TEXT,
+      status TEXT DEFAULT 'active' CHECK (status IN ('active', 'archived')),
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- 4. 复制现有数据（只复制有效的记录）
+    INSERT OR IGNORE INTO conversations_new (id, domain_id, session_id, title, status, created_at, updated_at)
+    SELECT
+      c.id,
+      c.domain_id,
+      COALESCE(c.session_id, ''),
+      c.title,
+      c.status,
+      COALESCE(c.started_at, CURRENT_TIMESTAMP),
+      COALESCE(c.last_message_at, c.started_at, CURRENT_TIMESTAMP)
+    FROM conversations c
+    INNER JOIN domains d ON c.domain_id = d.id
+    WHERE c.session_id IS NOT NULL AND c.session_id != '' AND c.domain_id IS NOT NULL;
+
+    -- 5. 删除旧表
+    DROP TABLE IF EXISTS conversations;
+
+    -- 6. 重命名新表
+    ALTER TABLE conversations_new RENAME TO conversations;
+
+    -- 7. 重建索引
+    CREATE INDEX idx_conversations_domain_id ON conversations(domain_id);
+    CREATE INDEX idx_conversations_session_id ON conversations(session_id);
+
+    -- 8. 删除 messages 表（消息由 AgentX 管理）
+    DROP TABLE IF EXISTS messages;
+
+    -- 9. 删除不再需要的 roles 和 memories 表（角色和记忆由 PromptX 管理）
+    DROP TABLE IF EXISTS memories;
+    DROP TABLE IF EXISTS roles;
   `;
 }
 
