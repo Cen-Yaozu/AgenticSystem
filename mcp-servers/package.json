@@ -1,0 +1,17 @@
+{
+  "name": "@agentic-rag/mcp-servers",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MCP Servers for Agentic RAG",
+  "main": "retriever.js",
+  "scripts": {
+    "test": "node retriever.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@qdrant/js-client-rest": "^1.16.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
