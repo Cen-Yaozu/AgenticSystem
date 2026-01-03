@@ -4,6 +4,20 @@
   "private": true,
   "description": "AgentX Agentic RAG - 智能助手平台",
   "type": "module",
+  "pnpm": {
+    "packageExtensions": {
+      "agentxjs": {
+        "dependencies": {
+          "@agentxjs/runtime": "^1.5.11"
+        }
+      },
+      "@agentxjs/persistence": {
+        "dependencies": {
+          "db0": "^0.3.0"
+        }
+      }
+    }
+  },
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
