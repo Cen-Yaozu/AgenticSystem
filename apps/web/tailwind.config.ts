@@ -4,6 +4,8 @@ const config: Config = {
   content: [
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',
+    // @agentxjs/ui 组件样式
+    './node_modules/@agentxjs/ui/dist/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
     extend: {

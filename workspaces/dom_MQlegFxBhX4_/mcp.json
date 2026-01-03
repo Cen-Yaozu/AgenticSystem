@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "promptx": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "promptx-mcp"
+      ],
+      "env": {
+        "WORKSPACE_DIR": "/Users/macmima1234/Desktop/agentic-rag/workspaces/dom_MQlegFxBhX4_"
+      }
+    }
+  }
+}

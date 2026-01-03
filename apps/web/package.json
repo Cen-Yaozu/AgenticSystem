@@ -22,6 +22,7 @@
     "@agentxjs/agent": "^1.4.0",
     "@agentxjs/runtime": "^1.4.0",
     "@agentxjs/types": "^1.4.0",
+    "@agentxjs/ui": "1.5.8",
     "@anthropic-ai/sdk": "^0.39.0",
     "@hono/node-server": "^1.13.7",
     "@hono/zod-validator": "^0.4.2",

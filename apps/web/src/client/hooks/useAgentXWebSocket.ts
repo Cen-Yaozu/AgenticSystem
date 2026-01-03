@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage, WebSocketStatus } from '../types';
+import type { MessageState } from '../types/agentx';
 
 interface AgentXEvent {
   type: string;
@@ -18,10 +19,12 @@ interface UseAgentXWebSocketReturn {
   messages: ChatMessage[];
   isConnected: boolean;
   status: WebSocketStatus;
+  messageState: MessageState;
   connect: () => void;
   disconnect: () => void;
   sendMessage: (content: string) => void;
   clearMessages: () => void;
+  interruptMessage: () => void;
 }
 
 const WS_URL = `ws://${window.location.hostname}:3001/ws`;
@@ -36,6 +39,7 @@ export function useAgentXWebSocket({
 }: UseAgentXWebSocketOptions): UseAgentXWebSocketReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<WebSocketStatus>('disconnected');
+  const [messageState, setMessageState] = useState<MessageState>('idle');
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -91,8 +95,16 @@ export function useAgentXWebSocket({
           }
 
           switch (data.type) {
-            case 'message_start': {
+            // 兼容原有事件格式
+            case 'message_start':
+            // 兼容 AgentX 事件格式
+            case 'conversation_start': {
+              // 如果已经有一个正在流式传输的消息，忽略这个事件
+              if (currentMessageRef.current && currentMessageRef.current.isStreaming) {
+                break;
+              }
               // 开始新消息
+              setMessageState('streaming');
               const newMessage: ChatMessage = {
                 id: `msg_${Date.now()}`,
                 role: 'assistant',
@@ -105,9 +117,19 @@ export function useAgentXWebSocket({
               break;
             }
 
-            case 'content_delta': {
+            // 思考中状态
+            case 'thinking_start': {
+              setMessageState('thinking');
+              break;
+            }
+
+            // 兼容原有事件格式
+            case 'content_delta':
+            // 兼容 AgentX 事件格式
+            case 'text_delta': {
               // 追加内容
-              const delta = (data.data as { delta?: string })?.delta || '';
+              const eventData = data.data as { delta?: string; text?: string };
+              const delta = eventData?.delta || eventData?.text || '';
               if (currentMessageRef.current) {
                 currentMessageRef.current.content += delta;
                 setMessages((prev) =>
@@ -137,8 +159,13 @@ export function useAgentXWebSocket({
               break;
             }
 
-            case 'message_complete': {
+            // 兼容原有事件格式
+            case 'message_complete':
+            // 兼容 AgentX 事件格式
+            case 'conversation_end':
+            case 'message_stop': {
               // 消息完成
+              setMessageState('completed');
               if (currentMessageRef.current) {
                 const completedMessage = {
                   ...currentMessageRef.current,
@@ -152,13 +179,36 @@ export function useAgentXWebSocket({
                 onMessage?.(completedMessage);
                 currentMessageRef.current = null;
               }
+              // 重置状态
+              setTimeout(() => setMessageState('idle'), 100);
+              break;
+            }
+
+            // 消息中断
+            case 'message_interrupted': {
+              setMessageState('completed');
+              if (currentMessageRef.current) {
+                const interruptedMessage = {
+                  ...currentMessageRef.current,
+                  isStreaming: false,
+                };
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === currentMessageRef.current?.id ? interruptedMessage : msg
+                  )
+                );
+                currentMessageRef.current = null;
+              }
+              setTimeout(() => setMessageState('idle'), 100);
               break;
             }
 
             case 'error': {
+              setMessageState('error');
               const errorData = data.data as { message?: string };
               const error = new Error(errorData?.message || 'Unknown error');
               onError?.(error);
+              setTimeout(() => setMessageState('idle'), 3000);
               break;
             }
           }
@@ -218,7 +268,19 @@ export function useAgentXWebSocket({
   const clearMessages = useCallback(() => {
     setMessages([]);
     currentMessageRef.current = null;
+    setMessageState('idle');
   }, []);
+
+  const interruptMessage = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'interrupt',
+          sessionId,
+        })
+      );
+    }
+  }, [sessionId]);
 
   // 自动连接
   useEffect(() => {
@@ -235,10 +297,12 @@ export function useAgentXWebSocket({
     messages,
     isConnected: status === 'connected',
     status,
+    messageState,
     connect,
     disconnect,
     sendMessage,
     clearMessages,
+    interruptMessage,
   };
 }
 

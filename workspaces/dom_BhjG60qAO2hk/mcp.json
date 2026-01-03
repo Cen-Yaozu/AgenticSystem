@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "promptx": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "promptx-mcp"
+      ],
+      "env": {
+        "WORKSPACE_DIR": "/Users/macmima1234/Desktop/agentic-rag/workspaces/dom_BhjG60qAO2hk"
+      }
+    },
+    "retriever": {
+      "command": "node",
+      "args": [
+        "/Users/macmima1234/Desktop/agentic-rag/mcp-servers/retriever.js"
+      ],
+      "env": {
+        "DOMAIN_ID": "dom_BhjG60qAO2hk",
+        "QDRANT_URL": "http://localhost:6333",
+        "QDRANT_API_KEY": "",
+        "QDRANT_COLLECTION": "agentic_rag_documents",
+        "RETRIEVAL_TOP_K": "5",
+        "RETRIEVAL_THRESHOLD": "0.7",
+        "OPENAI_API_KEY": "sk-xxxxx",
+        "EMBEDDING_MODEL": "text-embedding-3-small"
+      }
+    }
+  }
+}

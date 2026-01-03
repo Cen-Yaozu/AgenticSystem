@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Button, Loading } from '../components/atoms';
-import { ChatWindow } from '../components/organisms/ChatWindow';
+import { AgentXMessageList } from '../components/organisms/AgentXMessageList';
 import { MessageInput } from '../components/organisms/MessageInput';
 import { useAgentXWebSocket } from '../hooks/useAgentXWebSocket';
 import { useConversation, useMessages, useSendMessage } from '../hooks/useConversations';
 import { useDomain } from '../hooks/useDomains';
 import type { ChatMessage } from '../types';
+import type { MessageState } from '../types/agentx';
 
 export default function ChatPage() {
   const { id: domainId, convId } = useParams<{ id: string; convId: string }>();
@@ -20,7 +21,8 @@ export default function ChatPage() {
     messages: wsMessages,
     isConnected,
     status,
-    sendMessage: wsSendMessage,
+    messageState,
+    interruptMessage,
   } = useAgentXWebSocket({
     sessionId: conversation?.sessionId || '',
     autoConnect: !!conversation?.sessionId,
@@ -161,18 +163,42 @@ export default function ChatPage() {
 
       {/* 聊天区域 */}
       <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full overflow-hidden">
-        <ChatWindow messages={allMessages} isLoading={isStreaming} />
+        <AgentXMessageList
+          messages={allMessages}
+          isLoading={isStreaming}
+          messageState={messageState as MessageState}
+        />
 
         {/* 输入区域 */}
         <div className="bg-white border-t border-gray-200 p-4">
-          <MessageInput
-            onSend={handleSendMessage}
-            disabled={!isConnected}
-            isLoading={sendMessageMutation.isPending || isStreaming}
-            placeholder={
-              isConnected ? '输入消息...' : '等待连接...'
-            }
-          />
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <MessageInput
+                onSend={handleSendMessage}
+                disabled={!isConnected}
+                isLoading={sendMessageMutation.isPending || isStreaming}
+                placeholder={
+                  isConnected ? '输入消息...' : '等待连接...'
+                }
+              />
+            </div>
+            {isStreaming && (
+              <Button
+                variant="outline"
+                onClick={() => interruptMessage()}
+                className="shrink-0"
+              >
+                停止
+              </Button>
+            )}
+          </div>
+          {messageState && messageState !== 'idle' && messageState !== 'completed' && (
+            <div className="mt-2 text-sm text-gray-500">
+              {messageState === 'thinking' && '思考中...'}
+              {messageState === 'streaming' && '生成中...'}
+              {messageState === 'error' && '发生错误'}
+            </div>
+          )}
         </div>
       </main>
     </div>

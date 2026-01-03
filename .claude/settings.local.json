@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__promptx-local__action",
+      "Bash(git log:*)",
+      "Bash(sqlite3:*)"
+    ]
+  }
+}
