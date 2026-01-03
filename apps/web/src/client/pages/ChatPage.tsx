@@ -24,8 +24,8 @@ export default function ChatPage() {
     messageState,
     interruptMessage,
   } = useAgentXWebSocket({
-    sessionId: conversation?.sessionId || '',
-    autoConnect: !!conversation?.sessionId,
+    imageId: conversation?.imageId || '',
+    autoConnect: !!conversation?.imageId,
   });
 
   // 合并历史消息和 WebSocket 消息
@@ -177,9 +177,7 @@ export default function ChatPage() {
                 onSend={handleSendMessage}
                 disabled={!isConnected}
                 isLoading={sendMessageMutation.isPending || isStreaming}
-                placeholder={
-                  isConnected ? '输入消息...' : '等待连接...'
-                }
+                placeholder={isConnected ? '输入消息...' : '等待连接...'}
               />
             </div>
             {isStreaming && (

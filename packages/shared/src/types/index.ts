@@ -237,7 +237,8 @@ export interface Message {
 export interface Conversation {
   id: ID;
   domainId: ID;
-  sessionId: string;
+  /** AgentX Image ID (img_xxx) - 每个对话对应一个独立的 Image */
+  imageId: string;
   title: string | null;
   status: 'active' | 'archived';
   createdAt: Timestamp;

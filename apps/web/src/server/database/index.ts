@@ -92,6 +92,7 @@ async function runMigrations(): Promise<void> {
     { name: '004_add_document_fields', sql: getDocumentFieldsMigration() },
     { name: '005_rename_assistant_to_domain', sql: getRenameAssistantToDomainMigration() },
     { name: '006_conversation_agentx_integration', sql: getConversationAgentXIntegrationMigration() },
+    { name: '007_rename_session_id_to_image_id', sql: getRenameSessionIdToImageIdMigration() },
   ];
 
   // 应用未执行的迁移
@@ -406,6 +407,41 @@ function getConversationAgentXIntegrationMigration(): string {
     -- 9. 删除不再需要的 roles 和 memories 表（角色和记忆由 PromptX 管理）
     DROP TABLE IF EXISTS memories;
     DROP TABLE IF EXISTS roles;
+  `;
+}
+
+/**
+ * 重命名 session_id 为 image_id 迁移
+ * 修正 AgentX 集成：1 Conversation = 1 Image
+ */
+function getRenameSessionIdToImageIdMigration(): string {
+  return `
+    -- 1. 创建新的 conversations 表结构（使用 image_id 替代 session_id）
+    CREATE TABLE IF NOT EXISTS conversations_v2 (
+      id TEXT PRIMARY KEY,
+      domain_id TEXT NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
+      image_id TEXT NOT NULL,
+      title TEXT,
+      status TEXT DEFAULT 'active' CHECK (status IN ('active', 'archived')),
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- 2. 复制现有数据（session_id -> image_id）
+    INSERT OR IGNORE INTO conversations_v2 (id, domain_id, image_id, title, status, created_at, updated_at)
+    SELECT id, domain_id, session_id, title, status, created_at, updated_at
+    FROM conversations
+    WHERE session_id IS NOT NULL AND session_id != '';
+
+    -- 3. 删除旧表
+    DROP TABLE IF EXISTS conversations;
+
+    -- 4. 重命名新表
+    ALTER TABLE conversations_v2 RENAME TO conversations;
+
+    -- 5. 重建索引
+    CREATE INDEX IF NOT EXISTS idx_conversations_domain_id ON conversations(domain_id);
+    CREATE INDEX IF NOT EXISTS idx_conversations_image_id ON conversations(image_id);
   `;
 }
 

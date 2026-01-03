@@ -1,6 +1,10 @@
 /**
  * 聊天服务
- * 处理与 AgentX Session 的消息交互
+ * 处理与 AgentX Image 的消息交互
+ *
+ * 核心原则：1 Conversation = 1 Image
+ * - 每个对话有自己的 imageId
+ * - 使用对话的 imageId 发送消息和获取历史
  *
  * 注意：流式响应通过 AgentX WebSocket 直接传输给客户端，
  * 不通过后端 API。后端只负责验证权限和发送消息。
@@ -21,7 +25,7 @@ interface SendMessageInput {
 
 interface SendMessageResult {
   messageId: string;
-  sessionId: string;
+  imageId: string;
   titleGenerated?: boolean;
 }
 
@@ -71,18 +75,18 @@ export class ChatService {
     const db = getDatabase();
     const agentx = getAgentX();
 
-    // 1. 验证对话并获取 sessionId 和 title
+    // 1. 验证对话并获取 imageId 和 title
     const conversation = db
       .prepare(
         `
-        SELECT c.id, c.session_id as sessionId, c.domain_id as domainId, c.title
+        SELECT c.id, c.image_id as imageId, c.domain_id as domainId, c.title
         FROM conversations c
         INNER JOIN domains d ON c.domain_id = d.id
         WHERE c.id = ? AND d.user_id = ?
       `
       )
       .get(conversationId, userId) as
-      | { id: string; sessionId: string; domainId: string; title: string | null }
+      | { id: string; imageId: string; domainId: string; title: string | null }
       | undefined;
 
     if (!conversation) {
@@ -92,44 +96,20 @@ export class ChatService {
     let titleGenerated = false;
 
     try {
-      // 2. 获取 imageId（sessionId 存储的是 imageId）
-      // 使用 message_send_request 直接发送消息，它会自动激活 Agent
-      const containerId = `domain_${conversation.domainId}`;
-
-      // 2.1 获取 Container 下的 Image 列表
-      const imageListResponse = await agentx.request('image_list_request', {
-        requestId: `list_${nanoid()}`,
-        containerId,
-      });
-
-      const images = imageListResponse.data.records || [];
-      if (images.length === 0) {
-        throw new Error(`No images found for container ${containerId}`);
-      }
-
-      // 找到匹配的 image（通过 sessionId 或使用第一个）
-      const imageId = images[0].imageId;
-
-      // 3. 发送消息到 Agent（使用 message_send_request，推荐使用 imageId）
+      // 2. 使用对话自己的 imageId 发送消息
       // message_send_request 会自动激活 Agent（如果离线）
       const messageId = `msg_${nanoid()}`;
 
       const sendResponse = await agentx.request('message_send_request', {
         requestId: `send_${nanoid()}`,
-        imageId, // 使用 imageId（推荐），会自动激活 Agent
+        imageId: conversation.imageId, // 使用对话自己的 imageId
         content,
       });
 
       const agentId = sendResponse.data.agentId;
-      logger.info({ conversationId, imageId, agentId }, 'Message sent to AgentX');
+      logger.info({ conversationId, imageId: conversation.imageId, agentId }, 'Message sent to AgentX');
 
-      // 如果 agentId 与保存的 sessionId 不同，更新数据库
-      if (agentId !== conversation.sessionId) {
-        db.prepare('UPDATE conversations SET session_id = ? WHERE id = ?').run(agentId, conversationId);
-        logger.info({ conversationId, oldSessionId: conversation.sessionId, newSessionId: agentId }, 'Updated session ID');
-      }
-
-      // 4. 更新对话的 updated_at，如果没有标题则自动生成
+      // 3. 更新对话的 updated_at，如果没有标题则自动生成
       const now = new Date().toISOString();
 
       if (!conversation.title) {
@@ -149,11 +129,11 @@ export class ChatService {
         );
       }
 
-      logger.info({ conversationId, messageId, sessionId: conversation.sessionId }, 'Message sent successfully');
+      logger.info({ conversationId, messageId, imageId: conversation.imageId }, 'Message sent successfully');
 
       return {
         messageId,
-        sessionId: conversation.sessionId,
+        imageId: conversation.imageId,
         titleGenerated,
       };
     } catch (error) {
@@ -170,43 +150,27 @@ export class ChatService {
     const db = getDatabase();
     const agentx = getAgentX();
 
-    // 验证对话并获取 domainId
+    // 验证对话并获取 imageId
     const conversation = db
       .prepare(
         `
-        SELECT c.session_id as sessionId, c.domain_id as domainId
+        SELECT c.image_id as imageId
         FROM conversations c
         INNER JOIN domains d ON c.domain_id = d.id
         WHERE c.id = ? AND d.user_id = ?
       `
       )
-      .get(conversationId, userId) as { sessionId: string; domainId: string } | undefined;
+      .get(conversationId, userId) as { imageId: string } | undefined;
 
     if (!conversation) {
       throw new ConversationNotFoundError(conversationId);
     }
 
     try {
-      // 获取 Container 下的 Image 列表
-      const containerId = `domain_${conversation.domainId}`;
-      const imageListResponse = await agentx.request('image_list_request', {
-        requestId: `list_${nanoid()}`,
-        containerId,
-      });
-
-      const images = imageListResponse.data.records || [];
-      if (images.length === 0) {
-        logger.warn({ conversationId, containerId }, 'No images found for container');
-        return [];
-      }
-
-      // 使用第一个 image 的 imageId
-      const imageId = images[0].imageId;
-
-      // 从 AgentX 获取消息列表（使用 image_messages_request）
+      // 使用对话自己的 imageId 获取消息
       const messagesResponse = await agentx.request('image_messages_request', {
         requestId: `messages_${nanoid()}`,
-        imageId,
+        imageId: conversation.imageId,
       });
 
       const messages = messagesResponse.data.messages || [];
@@ -237,30 +201,31 @@ export class ChatService {
     const db = getDatabase();
     const agentx = getAgentX();
 
-    // 验证对话并获取 sessionId
+    // 验证对话并获取 imageId
     const conversation = db
       .prepare(
         `
-        SELECT c.session_id as sessionId
+        SELECT c.image_id as imageId
         FROM conversations c
         INNER JOIN domains d ON c.domain_id = d.id
         WHERE c.id = ? AND d.user_id = ?
       `
       )
-      .get(conversationId, userId) as { sessionId: string } | undefined;
+      .get(conversationId, userId) as { imageId: string } | undefined;
 
     if (!conversation) {
       throw new ConversationNotFoundError(conversationId);
     }
 
     try {
-      // 发送中断请求到 AgentX（使用 agent_interrupt_request）
+      // 发送中断请求到 AgentX（使用 agent_interrupt_request + imageId）
+      // AgentX 会自动找到对应的 Agent
       await agentx.request('agent_interrupt_request', {
         requestId: `abort_${nanoid()}`,
-        agentId: conversation.sessionId, // sessionId 存储的是 agentId
+        imageId: conversation.imageId,
       });
 
-      logger.info({ conversationId, sessionId: conversation.sessionId }, 'Generation aborted');
+      logger.info({ conversationId, imageId: conversation.imageId }, 'Generation aborted');
 
       return { aborted: true };
     } catch (error) {

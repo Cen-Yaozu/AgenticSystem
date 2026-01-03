@@ -1,6 +1,11 @@
 /**
  * 对话服务
- * 管理对话生命周期，与 AgentX Session 集成
+ * 管理对话生命周期，与 AgentX Image 集成
+ *
+ * 核心原则：1 Conversation = 1 Image
+ * - 每个对话创建自己的 Image（通过 image_create_request）
+ * - 配置从 Domain 复制到 Image
+ * - imageId 是对话的主要标识符
  */
 
 import type { Conversation, PaginatedResult } from '@agentic-rag/shared';
@@ -12,7 +17,7 @@ import {
 } from '../errors/business.error.js';
 import { domainRepository } from '../repositories/domain.repository.js';
 import { logger } from '../utils/logger.js';
-import { getAgentX } from './agentx.service.js';
+import { buildMCPServers, buildSystemPrompt, getAgentX } from './agentx.service.js';
 
 interface CreateConversationInput {
   domainId: string;
@@ -34,8 +39,10 @@ export class ConversationService {
    *
    * 流程：
    * 1. 验证领域存在且属于用户
-   * 2. 通过 AgentX 创建 Session（使用领域的 MetaImage）
+   * 2. 通过 AgentX 创建新的 Image（配置从 Domain 复制）
    * 3. 在数据库中创建对话记录
+   *
+   * 核心原则：1 Conversation = 1 Image
    */
   async createConversation(input: CreateConversationInput): Promise<Conversation> {
     const { domainId, userId, title } = input;
@@ -46,36 +53,26 @@ export class ConversationService {
       throw new DomainNotFoundError(domainId);
     }
 
-    // 2. 通过 AgentX 创建 Session
+    // 2. 通过 AgentX 创建新的 Image
     const agentx = getAgentX();
     const containerId = `domain_${domainId}`;
 
     try {
-      // 2.1 获取 Container 下的 Image 列表
-      const imageListResponse = await agentx.request('image_list_request', {
-        requestId: `list_${nanoid()}`,
+      // 2.1 创建新的 Image（每个对话一个独立的 Image）
+      // 配置从 Domain 复制
+      const imageResponse = await agentx.request('image_create_request', {
+        requestId: `create_${nanoid()}`,
         containerId,
+        config: {
+          name: title || `Conversation ${nanoid(6)}`,
+          description: `Conversation in domain ${domain.name}`,
+          systemPrompt: buildSystemPrompt(domain),
+          mcpServers: buildMCPServers(domain),
+        },
       });
 
-      const images = imageListResponse.data.records || [];
-      if (images.length === 0) {
-        throw new Error(`No images found for container ${containerId}`);
-      }
-
-      // 使用第一个 Image（领域创建时创建的 Image）
-      // ImageRecord 的 ID 字段是 imageId 而不是 id
-      const imageId = images[0].imageId;
-      logger.info({ domainId, containerId, imageId }, 'Found image for domain');
-
-      // 2.2 使用 image_run_request 运行 Image，创建 Agent
-      const runResponse = await agentx.request('image_run_request', {
-        requestId: `run_${nanoid()}`,
-        imageId,
-      });
-
-      // AgentX 返回 agentId，我们用它作为 sessionId
-      const agentId = runResponse.data.agentId;
-      logger.info({ domainId, imageId, agentId }, 'Created AgentX agent for conversation');
+      const imageId = imageResponse.data.record.imageId;
+      logger.info({ domainId, containerId, imageId }, 'Created new Image for conversation');
 
       // 3. 在数据库中创建对话记录
       const conversationId = `conv_${nanoid()}`;
@@ -83,18 +80,18 @@ export class ConversationService {
 
       const db = getDatabase();
       const stmt = db.prepare(`
-        INSERT INTO conversations (id, domain_id, session_id, title, status, created_at, updated_at)
+        INSERT INTO conversations (id, domain_id, image_id, title, status, created_at, updated_at)
         VALUES (?, ?, ?, ?, 'active', ?, ?)
       `);
 
-      // 使用 agentId 作为 session_id
-      stmt.run(conversationId, domainId, agentId, title || null, now, now);
+      // 存储 imageId 作为对话标识
+      stmt.run(conversationId, domainId, imageId, title || null, now, now);
 
       // 返回创建的对话
       return {
         id: conversationId,
         domainId,
-        sessionId: agentId,
+        imageId,
         title: title || null,
         status: 'active',
         createdAt: now,
@@ -129,7 +126,7 @@ export class ConversationService {
     const conversations = db
       .prepare(
         `
-        SELECT id, domain_id as domainId, session_id as sessionId,
+        SELECT id, domain_id as domainId, image_id as imageId,
                title, status, created_at as createdAt, updated_at as updatedAt
         FROM conversations
         WHERE domain_id = ?
@@ -170,7 +167,7 @@ export class ConversationService {
     const conversation = db
       .prepare(
         `
-        SELECT c.id, c.domain_id as domainId, c.session_id as sessionId,
+        SELECT c.id, c.domain_id as domainId, c.image_id as imageId,
                c.title, c.status, c.created_at as createdAt, c.updated_at as updatedAt
         FROM conversations c
         INNER JOIN domains d ON c.domain_id = d.id
@@ -183,32 +180,13 @@ export class ConversationService {
       throw new ConversationNotFoundError(conversationId);
     }
 
-    // 从 AgentX 获取消息（使用 image_messages_request）
+    // 从 AgentX 获取消息（使用对话自己的 imageId）
     const agentx = getAgentX();
     try {
-      // 获取 Container 下的 Image 列表
-      const containerId = `domain_${conversation.domainId}`;
-      const imageListResponse = await agentx.request('image_list_request', {
-        requestId: `list_${nanoid()}`,
-        containerId,
-      });
-
-      const images = imageListResponse.data.records || [];
-      if (images.length === 0) {
-        logger.warn({ conversationId, containerId }, 'No images found for container');
-        return {
-          ...conversation,
-          messages: [],
-        };
-      }
-
-      // 使用第一个 image 的 imageId
-      const imageId = images[0].imageId;
-
-      // 从 AgentX 获取消息列表（使用 image_messages_request）
+      // 使用对话自己的 imageId 获取消息
       const messagesResponse = await agentx.request('image_messages_request', {
         requestId: `messages_${nanoid()}`,
-        imageId,
+        imageId: conversation.imageId,
       });
 
       const messages = messagesResponse.data.messages || [];
@@ -250,29 +228,29 @@ export class ConversationService {
     const conversation = db
       .prepare(
         `
-        SELECT c.id, c.session_id as sessionId
+        SELECT c.id, c.image_id as imageId
         FROM conversations c
         INNER JOIN domains d ON c.domain_id = d.id
         WHERE c.id = ? AND d.user_id = ?
       `
       )
-      .get(conversationId, userId) as { id: string; sessionId: string } | undefined;
+      .get(conversationId, userId) as { id: string; imageId: string } | undefined;
 
     if (!conversation) {
       throw new ConversationNotFoundError(conversationId);
     }
 
-    // 删除 AgentX Session
+    // 删除 AgentX Image（会同时删除关联的 Session）
     const agentx = getAgentX();
     try {
-      await agentx.request('agent_destroy_request', {
-        requestId: `destroy_${nanoid()}`,
-        sessionId: conversation.sessionId,
+      await agentx.request('image_delete_request', {
+        requestId: `delete_${nanoid()}`,
+        imageId: conversation.imageId,
       });
-      logger.info({ conversationId, sessionId: conversation.sessionId }, 'Destroyed AgentX session');
+      logger.info({ conversationId, imageId: conversation.imageId }, 'Deleted AgentX image');
     } catch (error) {
-      // Session 删除失败不应阻止数据库记录删除
-      logger.error({ err: error, conversationId }, 'Failed to destroy AgentX session');
+      // Image 删除失败不应阻止数据库记录删除
+      logger.error({ err: error, conversationId }, 'Failed to delete AgentX image');
     }
 
     // 删除数据库记录
@@ -323,7 +301,7 @@ export class ConversationService {
     const updated = db
       .prepare(
         `
-        SELECT id, domain_id as domainId, session_id as sessionId,
+        SELECT id, domain_id as domainId, image_id as imageId,
                title, status, created_at as createdAt, updated_at as updatedAt
         FROM conversations
         WHERE id = ?

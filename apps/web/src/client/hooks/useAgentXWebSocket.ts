@@ -4,12 +4,19 @@ import type { MessageState } from '../types/agentx';
 
 interface AgentXEvent {
   type: string;
-  sessionId?: string;
+  imageId?: string;
   data?: unknown;
+  context?: {
+    imageId?: string;
+    agentId?: string;
+    containerId?: string;
+    sessionId?: string;
+  };
 }
 
 interface UseAgentXWebSocketOptions {
-  sessionId: string;
+  /** AgentX Image ID (img_xxx) - 用于过滤事件 */
+  imageId: string;
   onMessage?: (message: ChatMessage) => void;
   onError?: (error: Error) => void;
   autoConnect?: boolean;
@@ -27,12 +34,18 @@ interface UseAgentXWebSocketReturn {
   interruptMessage: () => void;
 }
 
-const WS_URL = `ws://${window.location.hostname}:3001/ws`;
+// 自动发现 WebSocket URL：
+// - 开发环境：通过 Vite 代理 (ws://localhost:5173/ws -> ws://localhost:3000/ws)
+// - 生产环境：直接连接到同一服务器 (ws://host:port/ws)
+const getWebSocketUrl = () => {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}/ws`;
+};
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY_BASE = 1000; // 1 second
 
 export function useAgentXWebSocket({
-  sessionId,
+  imageId,
   onMessage,
   onError,
   autoConnect = true,
@@ -69,18 +82,18 @@ export function useAgentXWebSocket({
     setStatus('connecting');
 
     try {
-      const ws = new WebSocket(WS_URL);
+      const ws = new WebSocket(getWebSocketUrl());
       wsRef.current = ws;
 
       ws.onopen = () => {
         setStatus('connected');
         reconnectAttemptsRef.current = 0;
 
-        // 订阅 session 事件
+        // 订阅 image 事件
         ws.send(
           JSON.stringify({
             type: 'subscribe',
-            sessionId,
+            imageId,
           })
         );
       };
@@ -89,8 +102,9 @@ export function useAgentXWebSocket({
         try {
           const data: AgentXEvent = JSON.parse(event.data);
 
-          // 只处理当前 session 的事件
-          if (data.sessionId && data.sessionId !== sessionId) {
+          // 只处理当前 image 的事件（通过 context.imageId 过滤）
+          const eventImageId = data.context?.imageId || data.imageId;
+          if (eventImageId && eventImageId !== imageId) {
             return;
           }
 
@@ -241,7 +255,7 @@ export function useAgentXWebSocket({
       setStatus('error');
       onError?.(e as Error);
     }
-  }, [sessionId, onMessage, onError]);
+  }, [imageId, onMessage, onError]);
 
   const sendMessage = useCallback((content: string) => {
     // 添加用户消息到列表
@@ -258,12 +272,12 @@ export function useAgentXWebSocket({
       wsRef.current.send(
         JSON.stringify({
           type: 'message',
-          sessionId,
+          imageId,
           content,
         })
       );
     }
-  }, [sessionId]);
+  }, [imageId]);
 
   const clearMessages = useCallback(() => {
     setMessages([]);
@@ -276,22 +290,22 @@ export function useAgentXWebSocket({
       wsRef.current.send(
         JSON.stringify({
           type: 'interrupt',
-          sessionId,
+          imageId,
         })
       );
     }
-  }, [sessionId]);
+  }, [imageId]);
 
   // 自动连接
   useEffect(() => {
-    if (autoConnect && sessionId) {
+    if (autoConnect && imageId) {
       connect();
     }
 
     return () => {
       disconnect();
     };
-  }, [autoConnect, sessionId, connect, disconnect]);
+  }, [autoConnect, imageId, connect, disconnect]);
 
   return {
     messages,
