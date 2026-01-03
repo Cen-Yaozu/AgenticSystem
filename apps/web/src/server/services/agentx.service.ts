@@ -315,62 +315,89 @@ export async function unregisterDomainDefinition(domainId: string): Promise<void
 }
 
 /**
- * 为领域创建 Session
+ * 为领域创建 Session（通过 image_run_request）
  */
 export async function createDomainSession(
   domainId: string,
-  userId: string
+  imageId: string,
+  _userId: string
 ): Promise<AgentSession> {
   const agentx = getAgentX();
-  const definitionName = `domain_${domainId}`;
+  const containerId = `domain_${domainId}`;
 
-  // 获取或创建 MetaImage
-  const image = await agentx.images.getMetaImage(definitionName);
+  // 通过 image_run_request 创建 Session
+  const response = await agentx.request('image_run_request', {
+    requestId: `run_${Date.now()}`,
+    containerId,
+    imageId,
+  });
 
-  // 创建 Session
-  const session = await agentx.sessions.create(image.imageId, userId);
+  const session: AgentSession = {
+    sessionId: response.data.record.sessionId,
+    imageId: response.data.record.imageId,
+    userId: _userId,
+  };
 
-  logger.info({ domainId, sessionId: session.sessionId, userId }, 'Created AgentX session for domain');
+  logger.info({ domainId, sessionId: session.sessionId, imageId }, 'Created AgentX session for domain');
 
   return session;
 }
 
 /**
- * 获取 Session 并恢复 Agent
+ * 恢复 Session（通过 image_run_request）
  */
-export async function resumeSession(sessionId: string): Promise<Agent> {
+export async function resumeSession(imageId: string): Promise<{ sessionId: string }> {
   const agentx = getAgentX();
-  const session = await agentx.sessions.get(sessionId);
-  return session.resume();
+
+  // 通过 image_run_request 恢复 Session
+  const response = await agentx.request('image_run_request', {
+    requestId: `resume_${Date.now()}`,
+    imageId,
+  });
+
+  return {
+    sessionId: response.data.record.sessionId,
+  };
 }
 
 /**
- * 获取 Session 的消息历史
+ * 获取 Image 的消息历史（通过 image_messages_request）
  */
-export async function getSessionMessages(sessionId: string): Promise<AgentMessage[]> {
+export async function getSessionMessages(imageId: string): Promise<AgentMessage[]> {
   const agentx = getAgentX();
-  return agentx.sessions.getMessages(sessionId);
+
+  const response = await agentx.request('image_messages_request', {
+    requestId: `messages_${Date.now()}`,
+    imageId,
+  });
+
+  return response.data.messages || [];
 }
 
 /**
- * 删除 Session
+ * 删除 Image（通过 image_delete_request）
  */
-export async function deleteSession(sessionId: string): Promise<void> {
+export async function deleteSession(imageId: string): Promise<void> {
   const agentx = getAgentX();
-  await agentx.sessions.delete(sessionId);
-  logger.info({ sessionId }, 'Deleted AgentX session');
+
+  await agentx.request('image_delete_request', {
+    requestId: `delete_${Date.now()}`,
+    imageId,
+  });
+
+  logger.info({ imageId }, 'Deleted AgentX image');
 }
 
 // 导出类型（MCPServerConfig 和 MCPServersConfig 从 @agentic-rag/shared 重新导出）
 export type {
-    Agent,
-    AgentDefinition,
-    AgentDefinitionConfig,
-    AgentImage,
-    AgentMessage,
-    AgentSession,
-    AgentXConfig,
-    AgentXInstance
+  Agent,
+  AgentDefinition,
+  AgentDefinitionConfig,
+  AgentImage,
+  AgentMessage,
+  AgentSession,
+  AgentXConfig,
+  AgentXInstance
 };
 
 // 重新导出共享类型

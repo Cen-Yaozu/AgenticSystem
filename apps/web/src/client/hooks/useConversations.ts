@@ -94,7 +94,7 @@ export function useDeleteConversation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, domainId }: { id: string; domainId: string }) =>
+    mutationFn: ({ id, domainId: _domainId }: { id: string; domainId: string }) =>
       del<void>(`/conversations/${id}`),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({

@@ -7,9 +7,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 // 测试常量
 const TEST_USER_ID = 'test-user-001';
-const TEST_DOMAIN_ID = 'dom_test001';
 const TEST_CONVERSATION_ID = 'conv_test001';
-const TEST_SESSION_ID = 'session_test001';
+const TEST_IMAGE_ID = 'img_test001';
 
 // 测试数据库实例
 let testDb: Database.Database;
@@ -40,7 +39,7 @@ function createTestSchema(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS conversations (
       id TEXT PRIMARY KEY,
       domain_id TEXT NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
-      session_id TEXT NOT NULL UNIQUE,
+      image_id TEXT NOT NULL UNIQUE,
       title TEXT,
       status TEXT DEFAULT 'active',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -49,8 +48,8 @@ function createTestSchema(db: Database.Database): void {
 
     INSERT INTO users (id, name, email) VALUES ('test-user-001', 'Test User', 'test@example.com');
     INSERT INTO domains (id, user_id, name) VALUES ('dom_test001', 'test-user-001', 'Test Domain');
-    INSERT INTO conversations (id, domain_id, session_id, title)
-    VALUES ('conv_test001', 'dom_test001', 'session_test001', 'Test Conversation');
+    INSERT INTO conversations (id, domain_id, image_id, title)
+    VALUES ('conv_test001', 'dom_test001', 'img_test001', 'Test Conversation');
   `);
 }
 
@@ -96,8 +95,10 @@ describe('ChatService', () => {
     mockAgentXRequest.mockResolvedValue({
       success: true,
       data: {
-        sessionId: TEST_SESSION_ID,
-        agentId: 'agent_test001',
+        record: {
+          imageId: TEST_IMAGE_ID,
+          sessionId: 'session_test001',
+        },
       },
     });
   });
@@ -112,25 +113,20 @@ describe('ChatService', () => {
 
       expect(result).toBeDefined();
       expect(result.messageId).toMatch(/^msg_/);
-      expect(result.sessionId).toBe(TEST_SESSION_ID);
+      expect(result.imageId).toBeDefined();
 
       // 验证 AgentX 请求被正确调用
       expect(mockAgentXRequest).toHaveBeenCalledTimes(2);
 
-      // 第一次调用：恢复 Session
+      // 第一次调用：恢复 Session (image_run_request)
       expect(mockAgentXRequest).toHaveBeenNthCalledWith(1, 'image_run_request', expect.objectContaining({
-        containerId: `domain_${TEST_DOMAIN_ID}`,
-        userId: TEST_USER_ID,
-        sessionId: TEST_SESSION_ID,
+        imageId: TEST_IMAGE_ID,
       }));
 
-      // 第二次调用：发送消息
-      expect(mockAgentXRequest).toHaveBeenNthCalledWith(2, 'agent_send_request', expect.objectContaining({
-        sessionId: TEST_SESSION_ID,
+      // 第二次调用：发送消息 (session_send_request)
+      expect(mockAgentXRequest).toHaveBeenNthCalledWith(2, 'session_send_request', expect.objectContaining({
+        imageId: TEST_IMAGE_ID,
         content: 'Hello, AI!',
-        metadata: expect.objectContaining({
-          conversationId: TEST_CONVERSATION_ID,
-        }),
       }));
     });
 
@@ -171,7 +167,7 @@ describe('ChatService', () => {
       mockAgentXRequest
         .mockResolvedValueOnce({
           success: true,
-          data: { sessionId: TEST_SESSION_ID },
+          data: { record: { imageId: TEST_IMAGE_ID, sessionId: 'session_test001' } },
         })
         .mockRejectedValueOnce(new Error('Message send failed'));
 
@@ -239,8 +235,8 @@ describe('ChatService', () => {
       expect(result[1]?.metadata?.tokensUsed).toBe(150);
 
       // 验证 AgentX 请求
-      expect(mockAgentXRequest).toHaveBeenCalledWith('agent_list_request', expect.objectContaining({
-        sessionId: TEST_SESSION_ID,
+      expect(mockAgentXRequest).toHaveBeenCalledWith('image_messages_request', expect.objectContaining({
+        imageId: TEST_IMAGE_ID,
       }));
     });
 

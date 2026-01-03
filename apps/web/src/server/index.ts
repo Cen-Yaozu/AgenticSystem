@@ -1,10 +1,9 @@
-import { serve } from '@hono/node-server';
 import { config } from 'dotenv';
-import { createServer } from 'http';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger as honoLogger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
+import { createServer } from 'http';
 import { resolve } from 'path';
 
 import { initDatabase } from './database/index.js';
@@ -99,15 +98,17 @@ async function main() {
     const server = createServer((req, res) => {
       // 将请求转发给 Hono
       const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
-      app.fetch(
-        new Request(`http://${req.headers.host || `${host}:${port}`}${req.url}`, {
-          method: req.method || 'GET',
-          headers: req.headers as HeadersInit,
-          body: hasBody ? req : undefined,
-          // Node.js 22+ 要求在有 body 时设置 duplex
-          ...(hasBody && { duplex: 'half' }),
-        } as RequestInit)
-      ).then(async (honoRes) => {
+      Promise.resolve(
+        app.fetch(
+          new Request(`http://${req.headers.host || `${host}:${port}`}${req.url}`, {
+            method: req.method || 'GET',
+            headers: req.headers as HeadersInit,
+            body: hasBody ? req : undefined,
+            // Node.js 22+ 要求在有 body 时设置 duplex
+            ...(hasBody && { duplex: 'half' }),
+          } as RequestInit)
+        )
+      ).then(async (honoRes: Response) => {
         // 将 Hono 响应转发回客户端
         res.writeHead(honoRes.status, Object.fromEntries(honoRes.headers.entries()));
         if (honoRes.body) {
@@ -125,7 +126,7 @@ async function main() {
         } else {
           res.end();
         }
-      }).catch((error) => {
+      }).catch((error: unknown) => {
         logger.error({ err: error }, 'Error handling request');
         res.writeHead(500);
         res.end('Internal Server Error');

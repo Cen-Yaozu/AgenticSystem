@@ -8,7 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 // 测试常量
 const TEST_USER_ID = 'test-user-001';
 const TEST_DOMAIN_ID = 'dom_test001';
-const TEST_SESSION_ID = 'session_test001';
+const TEST_IMAGE_ID = 'img_test001';
 
 // 测试数据库实例
 let testDb: Database.Database;
@@ -48,7 +48,7 @@ function createTestSchema(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS conversations (
       id TEXT PRIMARY KEY,
       domain_id TEXT NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
-      session_id TEXT NOT NULL UNIQUE,
+      image_id TEXT NOT NULL UNIQUE,
       title TEXT,
       status TEXT DEFAULT 'active' CHECK (status IN ('active', 'archived')),
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -56,7 +56,7 @@ function createTestSchema(db: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_domain_id ON conversations(domain_id);
-    CREATE INDEX IF NOT EXISTS idx_conversations_session_id ON conversations(session_id);
+    CREATE INDEX IF NOT EXISTS idx_conversations_image_id ON conversations(image_id);
 
     -- 插入测试数据
     INSERT INTO users (id, name, email, status)
@@ -78,6 +78,8 @@ vi.mock('../services/agentx.service.js', () => ({
   getAgentX: vi.fn(() => ({
     request: mockAgentXRequest,
   })),
+  buildSystemPrompt: vi.fn(() => 'Test system prompt'),
+  buildMCPServers: vi.fn(() => ({})),
 }));
 
 // 导入错误类型
@@ -106,12 +108,13 @@ describe('ConversationService', () => {
     testDb.exec('DELETE FROM conversations');
     vi.clearAllMocks();
 
-    // 默认 mock AgentX 响应
+    // 默认 mock AgentX 响应 - image_create_request
     mockAgentXRequest.mockResolvedValue({
       success: true,
       data: {
-        sessionId: TEST_SESSION_ID,
-        agentId: 'agent_test001',
+        record: {
+          imageId: TEST_IMAGE_ID,
+        },
       },
     });
   });
@@ -127,14 +130,13 @@ describe('ConversationService', () => {
       expect(result).toBeDefined();
       expect(result.id).toMatch(/^conv_/);
       expect(result.domainId).toBe(TEST_DOMAIN_ID);
-      expect(result.sessionId).toBe(TEST_SESSION_ID);
+      expect(result.imageId).toBe(TEST_IMAGE_ID);
       expect(result.title).toBe('测试对话');
       expect(result.status).toBe('active');
 
       // 验证 AgentX 请求被正确调用
-      expect(mockAgentXRequest).toHaveBeenCalledWith('image_run_request', expect.objectContaining({
+      expect(mockAgentXRequest).toHaveBeenCalledWith('image_create_request', expect.objectContaining({
         containerId: `domain_${TEST_DOMAIN_ID}`,
-        userId: TEST_USER_ID,
       }));
     });
 
@@ -179,7 +181,7 @@ describe('ConversationService', () => {
 
       mockAgentXRequest.mockResolvedValue({
         success: true,
-        data: { sessionId: 'session_test002' },
+        data: { record: { imageId: 'img_test002' } },
       });
       await service.createConversation({
         domainId: TEST_DOMAIN_ID,
@@ -189,7 +191,7 @@ describe('ConversationService', () => {
 
       mockAgentXRequest.mockResolvedValue({
         success: true,
-        data: { sessionId: 'session_test003' },
+        data: { record: { imageId: 'img_test003' } },
       });
       await service.createConversation({
         domainId: TEST_DOMAIN_ID,
@@ -250,11 +252,17 @@ describe('ConversationService', () => {
         title: '详情测试',
       });
 
+      // Mock image_messages_request for getConversationById
+      mockAgentXRequest.mockResolvedValue({
+        success: true,
+        data: { messages: [] },
+      });
+
       const result = await service.getConversationById(TEST_USER_ID, created.id);
 
       expect(result.id).toBe(created.id);
       expect(result.title).toBe('详情测试');
-      expect(result.sessionId).toBe(TEST_SESSION_ID);
+      expect(result.imageId).toBe(TEST_IMAGE_ID);
     });
 
     it('应该在对话不存在时抛出错误', async () => {

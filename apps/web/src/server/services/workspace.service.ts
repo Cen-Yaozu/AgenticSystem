@@ -25,17 +25,21 @@ export interface Workspace {
 }
 
 /**
+ * MCP Server 配置接口
+ */
+interface McpServerConfig {
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+}
+
+/**
  * MCP 配置接口
  */
 interface McpConfig {
   mcpServers: {
-    promptx: {
-      command: string;
-      args: string[];
-      env: {
-        WORKSPACE_DIR: string;
-      };
-    };
+    promptx: McpServerConfig;
+    retriever: McpServerConfig;
   };
 }
 
